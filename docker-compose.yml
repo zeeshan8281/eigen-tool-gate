@@ -1,0 +1,20 @@
+# Local end-to-end run of the gate (PostgreSQL co-located, same as the TEE image).
+#   docker compose up --build
+#   curl localhost:8080/gate/attestation
+services:
+  gate:
+    build:
+      context: .
+      args:
+        POLICY_PATH: policies/demo-policy.yaml
+    ports:
+      - "8080:8080"
+    environment:
+      AGENT_ID: research-agent-prod
+      SESSION_ID: compose-session
+      POLICY_PATH: policies/demo-policy.yaml
+    volumes:
+      - gate-data:/data
+
+volumes:
+  gate-data:

@@ -1,0 +1,53 @@
+version: "1.0"
+agent_id: "research-agent-prod"
+description: "Production policy for the research agent demo"
+
+defaults:
+  verdict: DENY # deny-by-default: anything not listed is blocked
+
+rules:
+  - tool: "web_search"
+    verdict: ALLOW
+    constraints:
+      max_calls_per_minute: 30
+      blocked_domains: ["*.onion", "*.xxx"]
+
+  - tool: "file_read"
+    verdict: ALLOW
+    constraints:
+      allowed_paths: ["/workspace/**"]
+      blocked_paths: ["/etc/**", "/usr/**", "/bin/**", "/root/**"]
+
+  - tool: "file_write"
+    verdict: ALLOW
+    constraints:
+      allowed_paths: ["/workspace/src/**", "/workspace/output/**"]
+      blocked_paths: ["/etc/**", "/usr/**", "/bin/**"]
+      max_file_size_bytes: 10485760 # 10MB
+
+  - tool: "http_request"
+    verdict: ALLOW
+    constraints:
+      allowed_methods: ["GET", "POST"]
+      allowed_domains: ["api.github.com", "api.openai.com"]
+      max_body_size_bytes: 1048576
+
+  - tool: "shell_exec"
+    verdict: DENY # explicitly blocked
+
+  - tool: "wallet_transfer"
+    verdict: ALLOW
+    constraints:
+      max_amount_per_tx: 100 # USDC
+      max_amount_per_hour: 500
+      allowed_recipients: ["0xABC0000000000000000000000000000000000001", "0xDEF0000000000000000000000000000000000002"]
+      require_hitl_above: 50 # human-in-the-loop above $50
+
+spending_limits:
+  currency: "USDC"
+  per_session: 1000
+  per_day: 5000
+
+rate_limits:
+  global_max_calls_per_minute: 100
+  global_max_calls_per_hour: 2000

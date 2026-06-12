@@ -1,0 +1,26 @@
+version: "1.0"
+agent_id: "research-agent-prod"
+description: "Locked-down policy: read-only research, no writes, no money, no shell"
+
+defaults:
+  verdict: DENY
+
+rules:
+  - tool: "web_search"
+    verdict: ALLOW
+    constraints:
+      max_calls_per_minute: 10
+      blocked_domains: ["*.onion", "*.xxx", "*.ru"]
+
+  - tool: "file_read"
+    verdict: ALLOW
+    constraints:
+      allowed_paths: ["/workspace/input/**"]
+      blocked_paths: ["/etc/**", "/usr/**", "/bin/**", "/root/**", "/workspace/secrets/**"]
+
+  # Everything else (file_write, http_request, shell_exec, wallet_transfer)
+  # falls through to deny-by-default.
+
+rate_limits:
+  global_max_calls_per_minute: 20
+  global_max_calls_per_hour: 200
