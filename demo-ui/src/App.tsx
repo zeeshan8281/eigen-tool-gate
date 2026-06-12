@@ -4,22 +4,34 @@ import eigenWordmark from "./assets/brand/eigen-wordmark.svg";
 import Demo from "./Demo";
 
 const GH = "https://github.com/zeeshan8281/eigen-tool-gate";
-const THREAT_MODEL = `${GH}#threat-model-summary`;
-const README = `${GH}#readme`;
 const VERIFY_TEE =
   "https://verify-sepolia.eigencloud.xyz/app/0x6f6FF0B640CD262d3120B91cEB146E97620272f9";
 const EIGENCLOUD = "https://www.eigencloud.xyz";
+
+/* =====================================================================
+   "Verified Tool Gating" landing page.
+
+   Identity: the GATE that STAMPS and SEALS every decision. The signature
+   visual is the ALLOW=green / DENY=red duotone (the wax-stamp duality IS
+   the brand); Eigen indigo is only a structural/secondary accent.
+
+   Deliberately NOT the sibling's skeleton — no split-hero-with-terminal,
+   no 4-up stats strip, no architecture SVG, no comparison table, no 6-up
+   feature grid. Instead: centered stamping gate hero, a 74.6% → 0% stat,
+   policy-as-artifact, a signed-receipt "passport stamp", sealed-vs-unsealed
+   objection cards, and the live demo.
+   ===================================================================== */
 
 export default function App() {
   return (
     <div className="min-h-screen text-ink">
       <Nav />
-      <main className="mx-auto max-w-6xl px-5 sm:px-6">
+      <main>
         <Hero />
-        <StatsStrip />
-        <HowItWorks />
-        <NotAHook />
-        <Features />
+        <BypassStat />
+        <PolicyArtifact />
+        <SignedReceipt />
+        <HookObjection />
         <LiveDemoSection />
         <ClosingCTA />
       </main>
@@ -29,20 +41,18 @@ export default function App() {
 }
 
 /* ===================================================================== */
-/* Reusable bits                                                          */
+/* Shared bits                                                           */
 /* ===================================================================== */
 function Btn({
   children,
   href,
   variant = "solid",
   size = "md",
-  onClick,
 }: {
   children: ReactNode;
-  href?: string;
-  variant?: "solid" | "outline";
+  href: string;
+  variant?: "solid" | "outline" | "ghost";
   size?: "sm" | "md" | "lg";
-  onClick?: () => void;
 }) {
   const sz =
     size === "sm"
@@ -52,54 +62,41 @@ function Btn({
         : "px-4 py-2 text-[13px]";
   const look =
     variant === "solid"
-      ? "border border-eigen-accent/60 bg-eigen-accent/20 text-eigen-accent-soft hover:bg-eigen-accent/30 shadow-[0_0_30px_-10px_rgba(99,102,241,0.7)]"
-      : "border border-white/15 bg-white/5 text-ink hover:border-white/25 hover:bg-white/10";
+      ? "border border-pass/50 bg-pass/15 text-pass hover:bg-pass/25 shadow-[0_0_34px_-12px_rgba(52,211,153,0.8)]"
+      : variant === "outline"
+        ? "border border-white/15 bg-white/5 text-ink hover:border-white/30 hover:bg-white/10"
+        : "text-ink-soft hover:text-ink";
   const cls = `inline-flex items-center justify-center gap-2 rounded font-semibold transition ${sz} ${look}`;
-  if (href)
-    return (
-      <a
-        href={href}
-        className={cls}
-        {...(href.startsWith("http")
-          ? { target: "_blank", rel: "noreferrer" }
-          : {})}
-        onClick={onClick}
-      >
-        {children}
-      </a>
-    );
   return (
-    <button className={cls} onClick={onClick}>
+    <a
+      href={href}
+      className={cls}
+      {...(href.startsWith("http")
+        ? { target: "_blank", rel: "noreferrer" }
+        : {})}
+    >
       {children}
-    </button>
+    </a>
   );
 }
 
-function Kicker({ children }: { children: ReactNode }) {
-  return (
-    <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-eigen-accent-soft">
-      {children}
-    </div>
-  );
-}
-
-function Section({
+function SectionHead({
   id,
-  kicker,
+  eyebrow,
   title,
   lead,
-  children,
 }: {
   id?: string;
-  kicker: string;
+  eyebrow: string;
   title: ReactNode;
   lead?: ReactNode;
-  children: ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 py-16 md:py-20">
-      <Kicker>{kicker}</Kicker>
-      <h2 className="mt-3 max-w-3xl text-[28px] font-bold leading-[1.12] tracking-tight md:text-[36px]">
+    <div id={id} className="scroll-mt-24">
+      <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-eigen-accent-soft">
+        {eyebrow}
+      </div>
+      <h2 className="mt-3 max-w-3xl text-[27px] font-bold leading-[1.14] tracking-tight md:text-[36px]">
         {title}
       </h2>
       {lead && (
@@ -107,8 +104,30 @@ function Section({
           {lead}
         </p>
       )}
-      <div className="mt-9">{children}</div>
-    </section>
+    </div>
+  );
+}
+
+/* A reusable little signature glyph — a scribbled secp256k1 "seal" mark. */
+function SignatureGlyph({
+  className = "",
+  tone,
+}: {
+  className?: string;
+  tone: "pass" | "deny";
+}) {
+  const stroke = tone === "pass" ? "#34d399" : "#f87171";
+  return (
+    <svg viewBox="0 0 56 20" className={className} aria-hidden>
+      <path
+        d="M2 14 C 8 4, 12 18, 17 9 S 24 2, 28 12 S 36 18, 41 7 C 45 0, 50 14, 54 8"
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+    </svg>
   );
 }
 
@@ -125,27 +144,22 @@ function Nav() {
           <span className="text-[14px] font-medium">Tool Gating</span>
         </a>
         <div className="hidden items-center gap-7 text-[13px] text-ink-soft lg:flex">
-          <a className="transition hover:text-ink" href="#how">
-            How it works
+          <a className="transition hover:text-ink" href="#policy">
+            The policy
           </a>
-          <a className="transition hover:text-ink" href="#why">
-            Not just a hook
+          <a className="transition hover:text-ink" href="#receipt">
+            The receipt
+          </a>
+          <a className="transition hover:text-ink" href="#hook">
+            Not a hook
           </a>
           <a className="transition hover:text-ink" href="#demo">
             Live demo
           </a>
-          <a
-            className="transition hover:text-ink"
-            href={GH}
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
         </div>
         <div className="flex items-center gap-2">
           <Btn href="#demo" size="sm">
-            Open demo →
+            See it live →
           </Btn>
           <Btn href={GH} variant="outline" size="sm">
             GitHub ★
@@ -157,52 +171,131 @@ function Nav() {
 }
 
 /* ===================================================================== */
-/* Hero                                                                  */
+/* HERO — the stamping gate                                              */
 /* ===================================================================== */
-type FeedLine = { text: string; cls?: string; tail?: string; tailCls?: string };
+type GateItem = {
+  tool: string;
+  verdict: "ALLOW" | "DENY";
+  reason?: string;
+};
 
-const HERO_FEED: FeedLine[] = [
-  { text: 'you → agent', tail: '"research EigenLayer, then clean up old files"', tailCls: "text-ink" },
-  { text: "agent → web_search", tail: "ALLOW", tailCls: "text-pass" },
-  { text: "agent → file_write", tail: "ALLOW", tailCls: "text-pass" },
-  { text: "agent → db_query (SELECT)", tail: "ALLOW", tailCls: "text-pass" },
-  { text: "agent → file_read /etc/passwd", tail: "DENY · path", tailCls: "text-deny" },
-  { text: "agent → shell_exec", tail: "DENY · blocked", tailCls: "text-deny" },
-  { text: "agent → file_delete", tail: "DENY · needs human approval", tailCls: "text-deny" },
-  { text: "# every decision signed in the enclave, before the tool runs", cls: "text-ink-dim" },
+const GATE_CYCLE: GateItem[] = [
+  { tool: "web_search", verdict: "ALLOW" },
+  { tool: "file_write", verdict: "ALLOW" },
+  { tool: "db_query · SELECT", verdict: "ALLOW" },
+  { tool: "file_read /etc/passwd", verdict: "DENY", reason: "path" },
+  { tool: "shell_exec", verdict: "DENY", reason: "blocked" },
+  { tool: "file_delete", verdict: "DENY", reason: "needs approval" },
 ];
 
-function HeroFeed() {
-  const [n, setN] = useState(0);
+function StampingGate() {
+  const [i, setI] = useState(0);
+  const [phase, setPhase] = useState<"enter" | "stamped">("enter");
+
   useEffect(() => {
-    if (n >= HERO_FEED.length) {
-      const t = setTimeout(() => setN(0), 4200);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setN((x) => x + 1), n === 0 ? 700 : 520);
-    return () => clearTimeout(t);
-  }, [n]);
+    // chip enters, then the stamp slams down, then advance.
+    setPhase("enter");
+    const slam = setTimeout(() => setPhase("stamped"), 900);
+    const next = setTimeout(() => setI((x) => (x + 1) % GATE_CYCLE.length), 2400);
+    return () => {
+      clearTimeout(slam);
+      clearTimeout(next);
+    };
+  }, [i]);
+
+  const item = GATE_CYCLE[i];
+  const allow = item.verdict === "ALLOW";
+  const tone = allow ? "pass" : "deny";
+  const ring = allow
+    ? "border-pass/60 text-pass"
+    : "border-deny/60 text-deny";
 
   return (
-    <div className="rounded-lg border border-white/10 bg-surface-1/70 shadow-[0_0_60px_-20px_rgba(99,102,241,0.5)] backdrop-blur-sm">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 font-mono text-[11px] text-ink-dim">
-        <span>live feed · policy gate</span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-eigen-accent-soft live-dot" />
-          inside the TEE
-        </span>
-      </div>
-      <div className="min-h-[300px] space-y-2 p-4 font-mono text-[12.5px] leading-relaxed">
-        {HERO_FEED.slice(0, n).map((l, i) => (
-          <div key={i} className="row-in flex flex-wrap items-baseline gap-x-2">
-            <span className={l.cls ?? "text-ink-soft"}>{l.text}</span>
-            {l.tail && (
-              <span className={`font-semibold ${l.tailCls ?? "text-ink"}`}>
-                {l.tail}
+    <div className="mx-auto w-full max-w-[640px]">
+      {/* The gate housing */}
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-surface-1/70 px-5 py-7 shadow-[0_0_90px_-30px_rgba(99,102,241,0.5)] backdrop-blur-sm sm:px-8">
+        {/* header rail */}
+        <div className="mb-6 flex items-center justify-between font-mono text-[11px] text-ink-dim">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-eigen-accent-soft live-dot" />
+            policy gate · inside the TEE
+          </span>
+          <span className="uppercase tracking-[0.18em]">deny-by-default</span>
+        </div>
+
+        {/* the conveyor: chip → gate slot → stamped verdict */}
+        <div className="flex items-center gap-3 sm:gap-5">
+          {/* incoming tool-call chip */}
+          <div className="min-w-0 flex-1">
+            <div
+              key={`chip-${i}`}
+              className="chip-enter inline-flex max-w-full items-center gap-2 rounded-md border border-eigen-accent/40 bg-eigen-accent/10 px-3 py-2.5"
+            >
+              <span className="h-2 w-2 shrink-0 rounded-[2px] bg-eigen-accent-soft" />
+              <span className="truncate font-mono text-[13px] text-ink">
+                {item.tool}
               </span>
-            )}
+            </div>
+            <div className="mt-2 pl-1 font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-dim">
+              tool call enters →
+            </div>
           </div>
-        ))}
+
+          {/* the gate doors */}
+          <div className="relative flex h-[92px] w-[34px] shrink-0 items-stretch justify-center sm:w-[44px]">
+            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/15" />
+            <div
+              className={`gate-glow absolute inset-y-1 left-0 w-[6px] rounded-full ${allow ? "bg-pass/70" : "bg-deny/70"}`}
+            />
+            <div
+              className={`gate-glow absolute inset-y-1 right-0 w-[6px] rounded-full ${allow ? "bg-pass/70" : "bg-deny/70"}`}
+            />
+          </div>
+
+          {/* the stamped verdict */}
+          <div className="relative min-w-0 flex-1">
+            <div className="relative flex min-h-[92px] items-center justify-center">
+              {phase === "stamped" && (
+                <>
+                  {/* ink press flash */}
+                  <span
+                    key={`ink-${i}`}
+                    className={`ink-flash pointer-events-none absolute inset-0 rounded-full ${allow ? "bg-pass/30" : "bg-deny/30"} blur-md`}
+                  />
+                  {/* the wax stamp */}
+                  <div
+                    key={`stamp-${i}`}
+                    className={`stamp-press relative flex flex-col items-center gap-1 rounded-lg border-2 border-dashed bg-surface-0/60 px-3.5 py-2.5 ${ring}`}
+                  >
+                    <span className="font-mono text-[15px] font-extrabold uppercase tracking-[0.14em]">
+                      {item.verdict}
+                    </span>
+                    {item.reason && (
+                      <span className="font-mono text-[10px] uppercase tracking-wider opacity-80">
+                        · {item.reason}
+                      </span>
+                    )}
+                    <SignatureGlyph tone={tone} className="h-3 w-12" />
+                  </div>
+                </>
+              )}
+              {phase === "enter" && (
+                <span className="font-mono text-[11px] text-ink-dim">
+                  inspecting…
+                </span>
+              )}
+            </div>
+            <div className="mt-2 pr-1 text-right font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-dim">
+              ← stamped &amp; signed
+            </div>
+          </div>
+        </div>
+
+        {/* footer line */}
+        <div className="mt-6 border-t border-white/10 pt-4 text-center font-mono text-[11px] text-ink-dim">
+          every verdict is sealed in the enclave{" "}
+          <span className="text-ink-soft">before</span> the tool runs
+        </div>
       </div>
     </div>
   );
@@ -212,294 +305,609 @@ function Hero() {
   return (
     <section
       id="top"
-      className="grid items-center gap-12 py-16 md:grid-cols-[1.05fr_0.95fr] md:py-24"
+      className="relative mx-auto max-w-5xl px-5 pt-16 pb-12 text-center sm:px-6 md:pt-24"
     >
-      <div>
-        <span className="inline-flex rounded border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[11px] text-ink-soft">
-          Built on EigenCompute · Intel TDX TEE · verifiable
+      <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 font-mono text-[11px] text-ink-soft">
+        <span className="h-1.5 w-1.5 rounded-full bg-pass" />
+        Built on EigenCompute · Intel TDX · verifiable
+      </span>
+
+      <h1 className="mx-auto mt-7 max-w-4xl text-[34px] font-bold leading-[1.08] tracking-tight sm:text-[48px] md:text-[60px]">
+        Your agent can only do
+        <br className="hidden sm:block" /> what the policy{" "}
+        <span className="text-pass">allows</span>.
+        <br />
+        <span className="text-ink-dim">And anyone can prove it.</span>
+      </h1>
+
+      <p className="mx-auto mt-6 max-w-xl text-[16px] leading-relaxed text-ink-soft">
+        Every tool call passes through one gate inside a verifiable enclave —
+        and walks out with a stamp. A green{" "}
+        <span className="font-semibold text-pass">ALLOW</span> or a red{" "}
+        <span className="font-semibold text-deny">DENY</span>, signed and
+        hash-chained, before the tool ever runs.
+      </p>
+
+      <div className="mt-9 flex flex-wrap justify-center gap-3">
+        <Btn href="#demo" size="lg">
+          See it live →
+        </Btn>
+        <Btn href={GH} variant="outline" size="lg">
+          GitHub
+        </Btn>
+      </div>
+
+      <div className="mt-14">
+        <StampingGate />
+      </div>
+    </section>
+  );
+}
+
+/* ===================================================================== */
+/* BYPASS STAT — 74.6% → 0%                                              */
+/* ===================================================================== */
+function BypassStat() {
+  return (
+    <section className="mx-auto max-w-5xl px-5 py-14 sm:px-6">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-surface-1/50">
+        <div className="grid items-stretch gap-px bg-white/10 md:grid-cols-[1fr_auto_1fr]">
+          {/* before */}
+          <div className="bg-surface-1/60 p-7 text-center sm:p-9">
+            <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-deny">
+              Alignment alone
+            </div>
+            <div className="mt-3 text-[58px] font-extrabold leading-none tracking-tight text-deny sm:text-[72px]">
+              74.6%
+            </div>
+            <p className="mx-auto mt-3 max-w-xs text-[13px] leading-relaxed text-ink-soft">
+              Frontier models are socially engineered into authorizing{" "}
+              <span className="text-ink">fraudulent actions</span> three times
+              out of four — on alignment alone.
+            </p>
+          </div>
+
+          {/* arrow / gate divider */}
+          <div className="flex items-center justify-center bg-surface-1/60 px-6 py-4">
+            <div className="flex flex-col items-center gap-2">
+              <span className="rounded-md border border-eigen-accent/40 bg-eigen-accent/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-eigen-accent-soft">
+                + policy gate
+              </span>
+              <span className="text-[26px] text-ink-dim">→</span>
+            </div>
+          </div>
+
+          {/* after */}
+          <div className="bg-surface-1/60 p-7 text-center sm:p-9">
+            <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-pass">
+              Deterministic gate in front
+            </div>
+            <div className="mt-3 text-[58px] font-extrabold leading-none tracking-tight text-pass sm:text-[72px]">
+              0%
+            </div>
+            <p className="mx-auto mt-3 max-w-xs text-[13px] leading-relaxed text-ink-soft">
+              Bypass rate drops to zero across{" "}
+              <span className="text-ink">879 attempts</span>. The gate doesn't
+              get persuaded — it checks the rule and stamps the verdict.
+            </p>
+          </div>
+        </div>
+        <div className="border-t border-white/10 px-7 py-3.5 text-center font-mono text-[11px] text-ink-dim">
+          don't ask the model to behave. put a gate in front that can't be
+          talked out of it.
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ===================================================================== */
+/* POLICY AS ARTIFACT — read the YAML yourself                           */
+/* ===================================================================== */
+type PolicyLine = { text: string; tone?: "key" | "deny" | "pass" | "dim" };
+
+const POLICY_LINES: PolicyLine[] = [
+  { text: "defaults:" },
+  { text: "  verdict: DENY", tone: "deny" }, // 1
+  { text: "" },
+  { text: "rules:" },
+  { text: "  - tool: web_search" },
+  { text: "    verdict: ALLOW", tone: "pass" },
+  { text: "" },
+  { text: "  - tool: db_query" },
+  { text: "    verdict: ALLOW", tone: "pass" },
+  { text: "    constraints:" },
+  { text: "      allowed_sql: [SELECT]", tone: "key" }, // 10
+  { text: "      max_rows: 100", tone: "dim" },
+  { text: "" },
+  { text: "  - tool: file_delete" },
+  { text: "    verdict: ALLOW", tone: "pass" },
+  { text: "    constraints:" },
+  { text: "      require_hitl: true", tone: "key" }, // 16
+  { text: "" },
+  { text: "  - tool: shell_exec" },
+  { text: "    verdict: DENY", tone: "deny" }, // 19
+];
+
+const POLICY_CALLOUTS: {
+  lineIdx: number;
+  label: string;
+  body: string;
+  tone: "pass" | "deny";
+}[] = [
+  {
+    lineIdx: 1,
+    label: "deny-by-default",
+    body: "Anything not explicitly listed is DENIED. No silent allow.",
+    tone: "deny",
+  },
+  {
+    lineIdx: 10,
+    label: "allowed_sql: [SELECT]",
+    body: "SELECT runs; DROP TABLE / DELETE / UPDATE are denied — read-only by rule.",
+    tone: "deny",
+  },
+  {
+    lineIdx: 16,
+    label: "require_hitl: true",
+    body: "Deleting a file pauses for explicit human approval before it proceeds.",
+    tone: "pass",
+  },
+  {
+    lineIdx: 18,
+    label: "shell_exec → DENY",
+    body: "Arbitrary command execution is blocked outright, every time.",
+    tone: "deny",
+  },
+];
+
+function toneClass(tone?: PolicyLine["tone"]) {
+  switch (tone) {
+    case "pass":
+      return "text-pass";
+    case "deny":
+      return "text-deny";
+    case "key":
+      return "text-eigen-accent-soft";
+    case "dim":
+      return "text-ink-dim";
+    default:
+      return "text-ink-soft";
+  }
+}
+
+function PolicyArtifact() {
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-16 sm:px-6">
+      <SectionHead
+        id="policy"
+        eyebrow="The artifact"
+        title={
+          <>
+            The policy is just YAML.{" "}
+            <span className="text-ink-dim">Read it yourself.</span>
+          </>
+        }
+        lead="No black box, no model deciding what's safe in the moment. The gate enforces a plain file a non-cryptographer can read — and its SHA-256 is sealed into the enclave attestation."
+      />
+
+      <div className="mt-9 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        {/* the code panel */}
+        <div className="overflow-hidden rounded-lg border border-white/10 bg-black/40">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 font-mono text-[11px] text-ink-dim">
+            <span>demo-policy.yaml</span>
+            <span className="text-eigen-accent-soft">enforced · hashed</span>
+          </div>
+          <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-[1.7]">
+            {POLICY_LINES.map((l, idx) => {
+              const flagged = POLICY_CALLOUTS.some((c) => c.lineIdx === idx);
+              return (
+                <div
+                  key={idx}
+                  className={`-mx-2 flex items-baseline gap-3 rounded px-2 ${
+                    flagged ? "bg-white/[0.04]" : ""
+                  }`}
+                >
+                  <span className="w-5 shrink-0 select-none text-right text-[10px] text-ink-dim/60">
+                    {idx + 1}
+                  </span>
+                  <span className={toneClass(l.tone)}>
+                    {l.text || " "}
+                  </span>
+                </div>
+              );
+            })}
+          </pre>
+        </div>
+
+        {/* the callouts mapping rules → outcomes */}
+        <div className="flex flex-col gap-3.5">
+          <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-dim">
+            rule → what it actually denies
+          </div>
+          {POLICY_CALLOUTS.map((c) => {
+            const isDeny = c.tone === "deny";
+            return (
+              <div
+                key={c.label}
+                className={`rounded-lg border bg-surface-1/50 p-4 ${
+                  isDeny
+                    ? "border-deny/30"
+                    : "border-pass/30"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${
+                      isDeny
+                        ? "bg-deny/15 text-deny ring-1 ring-deny/30"
+                        : "bg-pass/15 text-pass ring-1 ring-pass/30"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${isDeny ? "bg-deny" : "bg-pass"}`}
+                    />
+                    {isDeny ? "denies" : "gates"}
+                  </span>
+                  <code className="font-mono text-[12.5px] text-ink">
+                    {c.label}
+                  </code>
+                </div>
+                <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
+                  {c.body}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ===================================================================== */
+/* SIGNED RECEIPT — the PolicyDecision envelope as a passport stamp      */
+/* ===================================================================== */
+const RECEIPT_FIELDS: {
+  key: string;
+  value: string;
+  note?: string;
+  noteTone?: "pass" | "indigo";
+}[] = [
+  { key: "toolName", value: "file_read" },
+  {
+    key: "verdict",
+    value: "DENY",
+    note: "the stamp itself",
+  },
+  { key: "reasonCode", value: "PATH_BLOCKED", note: "/etc/** is off-limits" },
+  {
+    key: "policyHash",
+    value: "sha256:9f2c…a71b",
+    note: "ties it to the attested policy",
+    noteTone: "indigo",
+  },
+  {
+    key: "sequenceNumber",
+    value: "#7",
+    note: "its place in the chain",
+    noteTone: "indigo",
+  },
+  {
+    key: "prevDecisionHash",
+    value: "0x4ad9…e02f",
+    note: "chained to the decision before it",
+    noteTone: "indigo",
+  },
+  {
+    key: "signature",
+    value: "0x8b1f…c3d4",
+    note: "sealed by the enclave key — unforgeable",
+    noteTone: "pass",
+  },
+];
+
+function SignedReceipt() {
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-16 sm:px-6">
+      <SectionHead
+        id="receipt"
+        eyebrow="The proof"
+        title="Every decision walks out as a signed receipt."
+        lead="Not a log line you have to trust — a self-verifying envelope. The signature seals it inside the enclave, prevDecisionHash chains it to the last, and policyHash ties it to the attested policy. Tamper with one field and the whole chain fails to verify."
+      />
+
+      <div className="mt-9 grid gap-8 lg:grid-cols-[1fr_0.78fr] lg:items-start">
+        {/* the receipt / passport stamp */}
+        <div className="relative">
+          {/* perforated ticket */}
+          <div className="relative overflow-hidden rounded-xl border border-white/12 bg-surface-1/70 shadow-[0_0_70px_-28px_rgba(52,211,153,0.5)]">
+            {/* header band */}
+            <div className="flex items-center justify-between border-b border-dashed border-white/15 bg-deny/[0.06] px-5 py-3.5">
+              <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink-soft">
+                PolicyDecision · receipt
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-sm bg-deny/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-deny ring-1 ring-deny/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-deny" />
+                DENY
+              </div>
+            </div>
+
+            {/* fields */}
+            <div className="divide-y divide-white/8 px-5">
+              {RECEIPT_FIELDS.map((f) => (
+                <div
+                  key={f.key}
+                  className="grid grid-cols-[120px_1fr] items-baseline gap-3 py-2.5 sm:grid-cols-[150px_1fr]"
+                >
+                  <span className="font-mono text-[11.5px] text-ink-dim">
+                    {f.key}
+                  </span>
+                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <code
+                      className={`font-mono text-[12.5px] ${
+                        f.key === "verdict"
+                          ? "font-bold text-deny"
+                          : "text-ink"
+                      }`}
+                    >
+                      {f.value}
+                    </code>
+                    {f.note && (
+                      <span
+                        className={`text-[11px] ${
+                          f.noteTone === "pass"
+                            ? "text-pass"
+                            : f.noteTone === "indigo"
+                              ? "text-eigen-accent-soft"
+                              : "text-ink-dim"
+                        }`}
+                      >
+                        ← {f.note}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* sealed footer with wax seal */}
+            <div className="flex items-center justify-between border-t border-dashed border-white/15 bg-pass/[0.05] px-5 py-4">
+              <div className="font-mono text-[10.5px] leading-relaxed text-ink-dim">
+                written to the append-only chain
+                <br />
+                <span className="text-pass">before</span> the error is raised
+              </div>
+              {/* wax seal */}
+              <div className="seal-float relative grid h-14 w-14 place-items-center rounded-full border-2 border-pass/60 bg-pass/15">
+                <div className="absolute inset-1 rounded-full border border-dashed border-pass/40" />
+                <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-pass">
+                  TEE
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* perforation dots on the sides */}
+          <div className="pointer-events-none absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-surface-0" />
+          <div className="pointer-events-none absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-surface-0" />
+        </div>
+
+        {/* what makes it tamper-proof */}
+        <div className="flex flex-col gap-3.5">
+          {[
+            [
+              "signature",
+              "Signed by a secp256k1 key that lives only inside the enclave. The operator never holds it, so a verdict can't be forged after the fact.",
+              "pass",
+            ],
+            [
+              "prevDecisionHash",
+              "Each receipt embeds the hash of the one before it. Remove or reorder a denial and the chain no longer links — verification flags exactly where.",
+              "indigo",
+            ],
+            [
+              "policyHash",
+              "The SHA-256 of the exact policy is stamped on every receipt and sealed into the attestation. Swap in a weaker policy and the hash changes — verifiers notice.",
+              "indigo",
+            ],
+          ].map(([t, b, tone]) => (
+            <div
+              key={t}
+              className={`rounded-lg border bg-surface-1/50 p-4 ${
+                tone === "pass" ? "border-pass/30" : "border-eigen-accent/30"
+              }`}
+            >
+              <code
+                className={`font-mono text-[12.5px] ${tone === "pass" ? "text-pass" : "text-eigen-accent-soft"}`}
+              >
+                {t}
+              </code>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">
+                {b}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ===================================================================== */
+/* HOOK OBJECTION — sealed vs unsealed stamps (NOT a table)              */
+/* ===================================================================== */
+function StampCard({
+  sealed,
+  title,
+  subtitle,
+  points,
+}: {
+  sealed: boolean;
+  title: string;
+  subtitle: string;
+  points: string[];
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-xl border bg-surface-1/50 p-6 sm:p-7 ${
+        sealed ? "border-pass/35" : "border-white/12"
+      }`}
+    >
+      {/* the stamp impression in the corner */}
+      <div
+        className={`pointer-events-none absolute -right-6 -top-6 grid h-28 w-28 rotate-[-12deg] place-items-center rounded-full border-[3px] ${
+          sealed ? "border-pass/50" : "border-deny/40 opacity-70"
+        }`}
+      >
+        <span
+          className={`text-center font-mono text-[10px] font-bold uppercase leading-tight tracking-[0.12em] ${
+            sealed ? "text-pass" : "text-deny"
+          }`}
+        >
+          {sealed ? (
+            <>
+              sealed
+              <br />✓
+            </>
+          ) : (
+            <>
+              not
+              <br />
+              sealed
+            </>
+          )}
         </span>
-        <h1 className="mt-6 text-[40px] font-bold leading-[1.04] tracking-tight md:text-[58px]">
-          Your agent can only do
-          <br />
-          what the policy allows.
-          <br />
-          <span className="text-ink-dim">And anyone can prove it.</span>
-        </h1>
-        <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-ink-soft">
-          Every tool call is intercepted inside a verifiable{" "}
-          <span className="font-medium text-ink">Intel TDX enclave</span>. Every{" "}
-          <span className="font-medium text-pass">ALLOW</span> and{" "}
-          <span className="font-medium text-deny">DENY</span> is{" "}
-          <span className="font-medium text-ink">signed and hash-chained</span>{" "}
-          before the tool runs. The operator can't disable the gate, the agent
-          can't hide a denial, and you can{" "}
-          <span className="font-medium text-ink">
-            re-verify the whole history yourself
-          </span>
-          .
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Btn href="#demo" size="lg">
-            See it live →
-          </Btn>
-          <Btn href={THREAT_MODEL} variant="outline" size="lg">
-            Read the threat model
-          </Btn>
-        </div>
+        {!sealed && (
+          <span className="absolute h-[3px] w-[120%] rotate-[24deg] bg-deny/50" />
+        )}
       </div>
-      <HeroFeed />
+
+      <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-dim">
+        {subtitle}
+      </div>
+      <h3
+        className={`mt-2 max-w-[14ch] text-[20px] font-bold tracking-tight ${
+          sealed ? "text-ink" : "text-ink-soft"
+        }`}
+      >
+        {title}
+      </h3>
+
+      <ul className="mt-5 space-y-3">
+        {points.map((p) => (
+          <li key={p} className="flex items-start gap-2.5 text-[13.5px]">
+            <span
+              className={`mt-[3px] grid h-4 w-4 shrink-0 place-items-center rounded-[3px] text-[10px] font-bold ${
+                sealed
+                  ? "bg-pass/15 text-pass ring-1 ring-pass/30"
+                  : "bg-deny/15 text-deny ring-1 ring-deny/30"
+              }`}
+            >
+              {sealed ? "✓" : "✕"}
+            </span>
+            <span className={sealed ? "text-ink" : "text-ink-soft"}>{p}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div
+        className={`mt-6 inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider ${
+          sealed
+            ? "bg-pass/15 text-pass"
+            : "bg-deny/10 text-deny line-through decoration-deny/60"
+        }`}
+      >
+        {sealed ? "runs on proof" : "runs on trust"}
+        {sealed && <SignatureGlyph tone="pass" className="h-3 w-9" />}
+      </div>
+    </div>
+  );
+}
+
+function HookObjection() {
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-16 sm:px-6">
+      <SectionHead
+        id="hook"
+        eyebrow={'"Isn\'t this just a before_tool_call hook?"'}
+        title="A hook is a stamp anyone can forge. The gate is one sealed in the enclave."
+        lead="Frameworks already let you intercept tool calls. But a userspace hook runs on infrastructure you have to trust — and leaves nothing behind to prove it ran, or ran honestly."
+      />
+
+      <div className="mt-9 grid gap-5 md:grid-cols-2">
+        <StampCard
+          sealed={false}
+          subtitle="userspace hook"
+          title="Runs on trust"
+          points={[
+            "Runs on infra the operator controls — patch it out or disable it.",
+            "No artifact: nothing proves the denial ever happened.",
+            "Swap in a weaker rule silently; no one downstream can tell.",
+            "Auditing means trusting whatever the logs say.",
+          ]}
+        />
+        <StampCard
+          sealed
+          subtitle="verified tool gate"
+          title="Runs on proof"
+          points={[
+            "Measured into the attestation — the operator can't skip it.",
+            "Every verdict is a signed, hash-chained receipt.",
+            "Change the policy and its hash changes — verifiers notice.",
+            "Re-verify every signature yourself, in the browser.",
+          ]}
+        />
+      </div>
     </section>
   );
 }
 
 /* ===================================================================== */
-/* Stats strip                                                           */
-/* ===================================================================== */
-const STATS: [string, string][] = [
-  ["TDX", "hardware enclave · every decision signed"],
-  ["0", "ways for the operator to skip the gate"],
-  ["1", "policy hash · sealed into the attestation"],
-  ["100%", "of denials persisted before the error is raised"],
-];
-
-function StatsStrip() {
-  return (
-    <section className="pb-2">
-      <div className="grid grid-cols-2 divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-surface-1/60 md:grid-cols-4 md:divide-x">
-        {STATS.map(([n, l]) => (
-          <div key={l} className="border-t border-white/10 px-6 py-6 text-center first:border-t-0 md:border-t-0">
-            <div className="text-[30px] font-bold tracking-tight text-eigen-accent-soft md:text-[38px]">
-              {n}
-            </div>
-            <div className="mt-1 text-[12px] leading-relaxed text-ink-soft">
-              {l}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ===================================================================== */
-/* How it works + Architecture SVG                                       */
-/* ===================================================================== */
-function GateArchitectureSVG() {
-  return (
-    <svg
-      viewBox="0 0 820 460"
-      className="w-full"
-      role="img"
-      aria-label="Verified Tool Gating architecture"
-    >
-      <defs>
-        <marker id="g-ah" markerWidth="9" markerHeight="9" refX="5" refY="4.5" orient="auto">
-          <path d="M1 1 L8 4.5 L1 8 Z" fill="currentColor" />
-        </marker>
-        <radialGradient id="g-glow" cx="0.5" cy="0.5" r="0.7">
-          <stop offset="0" stopColor="#6366f1" stopOpacity="0.22" />
-          <stop offset="1" stopColor="#6366f1" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* enclave boundary */}
-      <rect x="208" y="40" width="404" height="306" rx="16" fill="url(#g-glow)" stroke="#6366f1" strokeOpacity="0.5" strokeWidth="1.5" strokeDasharray="6 5" />
-      <text x="230" y="66" fontFamily="ui-monospace, monospace" fontSize="11" letterSpacing="2" fill="#818cf8">
-        INTEL TDX ENCLAVE · EIGENCOMPUTE
-      </text>
-
-      {/* agent */}
-      <g>
-        <rect x="24" y="150" width="132" height="56" rx="12" fill="#141417" stroke="#818cf8" strokeOpacity="0.5" />
-        <circle cx="52" cy="178" r="5" fill="#818cf8" />
-        <text x="68" y="183" fontFamily="ui-monospace, monospace" fontSize="14" fill="#ededef">agent</text>
-        <text x="24" y="232" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#737373">a real Claude model</text>
-      </g>
-
-      {/* agent -> gate */}
-      <g style={{ color: "#818cf8" }}>
-        <line x1="156" y1="178" x2="280" y2="178" stroke="#818cf8" strokeOpacity="0.7" strokeWidth="1.6" markerEnd="url(#g-ah)" />
-        <text x="170" y="168" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#a3a3a3">tool call</text>
-      </g>
-
-      {/* the gate */}
-      <rect x="282" y="138" width="148" height="80" rx="12" fill="#171717" stroke="#6366f1" strokeOpacity="0.8" strokeWidth="1.6" />
-      <text x="356" y="170" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="13" fontWeight="600" fill="#fafafa">Policy Gate</text>
-      <text x="356" y="190" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#a3a3a3">deny-by-default</text>
-      <text x="356" y="206" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#a3a3a3">in-process interceptor</text>
-
-      {/* gate -> allow -> tool */}
-      <g style={{ color: "#34d399" }}>
-        <line x1="430" y1="160" x2="556" y2="118" stroke="#34d399" strokeOpacity="0.75" strokeWidth="1.6" markerEnd="url(#g-ah)" />
-        <text x="452" y="128" fontFamily="ui-monospace, monospace" fontSize="11" fontWeight="600" fill="#34d399">ALLOW</text>
-      </g>
-      <rect x="556" y="92" width="120" height="48" rx="10" fill="#141417" stroke="#34d399" strokeOpacity="0.45" />
-      <text x="616" y="121" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="12" fill="#ededef">real tool</text>
-
-      {/* gate -> deny -> blocked */}
-      <g style={{ color: "#f87171" }}>
-        <line x1="430" y1="196" x2="556" y2="238" stroke="#f87171" strokeOpacity="0.75" strokeWidth="1.6" markerEnd="url(#g-ah)" />
-        <text x="452" y="234" fontFamily="ui-monospace, monospace" fontSize="11" fontWeight="600" fill="#f87171">DENY</text>
-      </g>
-      <rect x="556" y="214" width="120" height="48" rx="10" fill="#141417" stroke="#f87171" strokeOpacity="0.45" />
-      <text x="616" y="243" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="12" fill="#ededef">blocked</text>
-
-      {/* gate -> signed log (writes BEFORE verdict takes effect) */}
-      <g style={{ color: "#818cf8" }}>
-        <line x1="356" y1="218" x2="356" y2="286" stroke="#818cf8" strokeOpacity="0.6" strokeWidth="1.6" markerEnd="url(#g-ah)" />
-      </g>
-      <rect x="244" y="288" width="324" height="44" rx="10" fill="#171717" stroke="#ffffff1a" />
-      {[0, 1, 2, 3, 4].map((i) => (
-        <rect key={i} x={262 + i * 58} y="300" width="44" height="20" rx="4" fill={i % 2 ? "#6366f1" : "#312e81"} fillOpacity={i % 2 ? 0.55 : 0.75} />
-      ))}
-      <text x="406" y="356" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#a3a3a3">
-        signed hash-chained log · written before the verdict takes effect
-      </text>
-
-      {/* policy -> sha256 -> attestation */}
-      <g style={{ color: "#737373" }}>
-        <rect x="24" y="404" width="150" height="38" rx="8" fill="#141417" stroke="#ffffff14" />
-        <text x="99" y="428" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11.5" fill="#ededef">policy.yaml</text>
-        <line x1="174" y1="423" x2="246" y2="423" stroke="#737373" strokeOpacity="0.7" strokeWidth="1.4" markerEnd="url(#g-ah)" />
-        <text x="180" y="414" fontFamily="ui-monospace, monospace" fontSize="10" fill="#818cf8">sha256</text>
-        <rect x="248" y="404" width="150" height="38" rx="8" fill="#141417" stroke="#6366f1" strokeOpacity="0.4" />
-        <text x="323" y="428" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11.5" fill="#ededef">attestation</text>
-        <text x="412" y="428" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#737373">← anyone can re-check the hash</text>
-      </g>
-    </svg>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <Section
-      id="how"
-      kicker="How it works"
-      title="One gate. Every tool call passes through it. Nothing gets around it."
-      lead="The gate is an in-process interceptor inside the enclave — not a sidecar the agent can route around. Each call is matched against a deny-by-default policy, signed, and written to an append-only hash-chained log before the verdict takes effect."
-    >
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-surface-1/60 p-6 md:p-8">
-        <GateArchitectureSVG />
-      </div>
-    </Section>
-  );
-}
-
-/* ===================================================================== */
-/* Not just a hook — comparison table                                    */
-/* ===================================================================== */
-const COMPARE: [string, string, string][] = [
-  ["Where it runs", "your app, on infra you trust", "inside an attested Intel TDX enclave"],
-  ["Operator can skip it", "yes — patch it out or disable it", "no — it's measured into the attestation"],
-  ["Proof a denial happened", "none", "signed, hash-chained, persisted before the error"],
-  ["Swap in a weaker policy", "silent", "changes the attestation hash — verifiers notice"],
-  ["Audit after the fact", "trust the logs", "re-verify every signature yourself"],
-];
-
-function NotAHook() {
-  return (
-    <Section
-      id="why"
-      kicker={'"Isn\'t this just a before_tool_call hook?"'}
-      title="A hook runs on trust. A gate runs on proof."
-      lead="Frameworks already have tool-call hooks. They run in userspace on infrastructure you have to trust — and there's no proof they ran."
-    >
-      <div className="overflow-hidden rounded-lg border border-white/10">
-        <div className="grid grid-cols-[0.85fr_1fr_1fr] border-b border-white/10 bg-surface-1/60 font-mono text-[11px] uppercase tracking-wider text-ink-dim">
-          <div className="px-4 py-3 sm:px-5"> </div>
-          <div className="px-4 py-3 sm:px-5">Userspace hook</div>
-          <div className="border-l border-white/10 px-4 py-3 text-eigen-accent-soft sm:px-5">
-            Verified Tool Gating
-          </div>
-        </div>
-        {COMPARE.map(([label, hook, gate], i) => (
-          <div
-            key={label}
-            className={`grid grid-cols-[0.85fr_1fr_1fr] text-[13px] ${
-              i < COMPARE.length - 1 ? "border-b border-white/10" : ""
-            }`}
-          >
-            <div className="px-4 py-3.5 font-medium text-ink/90 sm:px-5">
-              {label}
-            </div>
-            <div className="px-4 py-3.5 text-ink-soft sm:px-5">{hook}</div>
-            <div className="border-l border-white/10 px-4 py-3.5 text-ink sm:px-5">
-              {gate}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-/* ===================================================================== */
-/* Features                                                              */
-/* ===================================================================== */
-const FEATURES: [string, string][] = [
-  ["Deny-by-default policy", "Plain YAML a non-cryptographer can read. Anything not explicitly allowed is blocked."],
-  ["Runs in an Intel TDX TEE", "The gate is compiled into the enclave image; the signing key is sealed and never leaves."],
-  ["Signed, hash-chained decisions", "Every ALLOW and DENY is secp256k1-signed and linked to the last — tamper-evident."],
-  ["A real agent, real tools", "A live Claude model calls real tools — web search, files, SQL — each one gated before it runs."],
-  ["Human-in-the-loop", "Destructive actions like file deletion require explicit human approval to proceed."],
-  ["Verify it yourself", "Re-check every signature and the whole chain in your browser. No trust in the server."],
-];
-
-function Features() {
-  return (
-    <Section kicker="What you get" title="A gate you can prove, not a hook you hope ran.">
-      <div className="grid gap-4 md:grid-cols-3">
-        {FEATURES.map(([t, b]) => (
-          <div
-            key={t}
-            className="rounded-lg border border-white/10 bg-surface-1/60 p-6 transition hover:border-eigen-accent/40"
-          >
-            <h3 className="text-[15px] font-semibold">{t}</h3>
-            <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">{b}</p>
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-/* ===================================================================== */
-/* Live demo section                                                     */
+/* LIVE DEMO                                                             */
 /* ===================================================================== */
 function LiveDemoSection() {
   return (
-    <Section
-      id="demo"
-      kicker="Live demo"
-      title="Run a real agent. Watch the gate decide."
-      lead="This is the real engine — talking to the live enclave over the same origin. Run a scenario or prompt the agent, then re-verify every signature yourself."
-    >
-      <div className="rounded-lg border border-white/10 bg-surface-1/40 p-4 sm:p-6">
+    <section className="mx-auto max-w-6xl px-5 py-16 sm:px-6">
+      <SectionHead
+        id="demo"
+        eyebrow="Live demo"
+        title="Run a real agent. Watch the gate decide."
+        lead="This is the real engine talking to the live enclave over the same origin. Prompt the agent or run a scenario, then re-verify every signature yourself. The explainer above stays put even if the API is asleep."
+      />
+      <div className="mt-9 rounded-xl border border-white/10 bg-surface-1/40 p-4 sm:p-6">
         <Demo />
       </div>
-    </Section>
+    </section>
   );
 }
 
 /* ===================================================================== */
-/* Closing CTA                                                           */
+/* CLOSING                                                               */
 /* ===================================================================== */
 function ClosingCTA() {
   return (
-    <section className="py-20">
-      <div className="flex flex-col items-center rounded-lg border border-white/10 bg-surface-1/60 px-8 py-16 text-center shadow-[0_0_80px_-30px_rgba(99,102,241,0.6)]">
-        <Kicker>Verified Tool Gating</Kicker>
-        <h2 className="mt-4 max-w-2xl text-[30px] font-bold tracking-tight md:text-[38px]">
-          Stop trusting that your agent behaved.{" "}
-          <span className="text-ink-dim">Prove it.</span>
-        </h2>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Btn href="#demo" size="lg">
-            Open the live demo →
-          </Btn>
-          <Btn href={GH} variant="outline" size="lg">
-            GitHub
-          </Btn>
+    <section className="mx-auto max-w-6xl px-5 py-16 sm:px-6">
+      <div className="relative flex flex-col items-center overflow-hidden rounded-2xl border border-white/10 bg-surface-1/60 px-6 py-16 text-center">
+        {/* dual-tone glow */}
+        <div className="pointer-events-none absolute -left-20 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-deny/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-pass/10 blur-3xl" />
+
+        <div className="relative">
+          <div className="font-mono text-[11px] uppercase tracking-[0.22em] text-eigen-accent-soft">
+            Verified Tool Gating
+          </div>
+          <h2 className="mt-4 max-w-2xl text-[30px] font-bold tracking-tight md:text-[40px]">
+            Stop trusting that your agent behaved.{" "}
+            <span className="text-pass">Prove it.</span>
+          </h2>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Btn href="#demo" size="lg">
+              See it live →
+            </Btn>
+            <Btn href={GH} variant="outline" size="lg">
+              GitHub
+            </Btn>
+          </div>
         </div>
       </div>
     </section>
@@ -507,29 +915,49 @@ function ClosingCTA() {
 }
 
 /* ===================================================================== */
-/* Footer                                                                */
+/* FOOTER                                                                */
 /* ===================================================================== */
-const FOOTER: [string, [string, string][]][] = [
-  ["Product", [["How it works", "#how"], ["Not just a hook", "#why"], ["Live demo", "#demo"]]],
-  ["Developers", [["GitHub", GH], ["README", README]]],
-  ["More", [["Verify the TEE →", VERIFY_TEE], ["EigenCloud →", EIGENCLOUD]]],
+const FOOTER_LINKS: [string, [string, string][]][] = [
+  [
+    "Explore",
+    [
+      ["The policy", "#policy"],
+      ["The receipt", "#receipt"],
+      ["Not a hook", "#hook"],
+      ["Live demo", "#demo"],
+    ],
+  ],
+  [
+    "Verify",
+    [
+      ["GitHub", GH],
+      ["Verify the TEE →", VERIFY_TEE],
+      ["EigenCloud →", EIGENCLOUD],
+    ],
+  ],
 ];
 
 function Footer() {
   return (
-    <footer className="mt-10 border-t border-white/10">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+    <footer className="mt-6 border-t border-white/10">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <img src={eigenIcon} alt="Eigen" className="h-7 w-auto text-eigen-accent-soft" />
-            <span className="text-[17px] font-semibold">Verified Tool Gating</span>
+            <img
+              src={eigenIcon}
+              alt="Eigen"
+              className="h-7 w-auto text-eigen-accent-soft"
+            />
+            <span className="text-[17px] font-semibold">
+              Verified Tool Gating
+            </span>
           </div>
           <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ink-soft">
-            Verifiable, tamper-proof authorization for AI agents — part 4 of the
+            Verifiable, tamper-proof authorization for AI agents · part 4 of the
             EigenCloud Agent Observability series.
           </p>
         </div>
-        {FOOTER.map(([h, links]) => (
+        {FOOTER_LINKS.map(([h, links]) => (
           <div key={h}>
             <div className="font-mono text-[11px] uppercase tracking-wider text-ink-dim">
               {h}
@@ -553,9 +981,14 @@ function Footer() {
         ))}
       </div>
       <div className="border-t border-white/10">
-        <div className="mx-auto max-w-6xl px-5 py-6 font-mono text-[11px] text-ink-dim sm:px-6">
-          Verified Tool Gating · Intel TDX · EigenCompute · every tool call,
-          gated
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-5 py-6 font-mono text-[11px] text-ink-dim sm:px-6">
+          <span className="text-pass">ALLOW</span>
+          <span className="text-ink-dim/50">/</span>
+          <span className="text-deny">DENY</span>
+          <span className="text-ink-dim/50">·</span>
+          <span>every tool call, stamped &amp; sealed</span>
+          <span className="text-ink-dim/50">·</span>
+          <span>Intel TDX · EigenCompute</span>
         </div>
       </div>
     </footer>

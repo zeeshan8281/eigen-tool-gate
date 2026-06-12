@@ -118,3 +118,107 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
+
+/* ---- gate / wax-stamp hero animations -------------------------------- */
+
+/* The tool-call chip slides in from the left into the gate slot. */
+@keyframes chipEnter {
+  0% {
+    opacity: 0;
+    transform: translateX(-46px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(2px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+.chip-enter {
+  animation: chipEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* The stamp slams down: big -> overshoot small -> settle, with a slight
+   rotation so it feels physically pressed, then it sits. */
+@keyframes stampPress {
+  0% {
+    opacity: 0;
+    transform: rotate(-14deg) scale(2.4);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(-7deg) scale(0.92);
+  }
+  70% {
+    transform: rotate(-7deg) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-7deg) scale(1);
+  }
+}
+.stamp-press {
+  animation: stampPress 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: center;
+}
+
+/* A quick ink-press flash behind the stamp on impact. */
+@keyframes inkFlash {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  40% {
+    opacity: 0.55;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+.ink-flash {
+  animation: inkFlash 0.55s ease-out both;
+}
+
+/* Gate "doors" subtly pulse when a verdict lands. */
+@keyframes gateGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.gate-glow {
+  animation: gateGlow 2.4s ease-in-out infinite;
+}
+
+/* Soft float for the seal wax on the receipt. */
+@keyframes sealFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-8deg);
+  }
+}
+.seal-float {
+  animation: sealFloat 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip-enter,
+  .stamp-press,
+  .ink-flash,
+  .gate-glow,
+  .seal-float,
+  .live-dot,
+  .shimmer {
+    animation: none !important;
+  }
+}
