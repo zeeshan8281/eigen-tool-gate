@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import eigenIcon from "./assets/brand/eigen-icon.svg";
 import eigenWordmark from "./assets/brand/eigen-wordmark.svg";
-import Demo from "./Demo";
+
+const APP_URL = "./app.html";
 
 const GH = "https://github.com/zeeshan8281/eigen-tool-gate";
 const VERIFY_TEE =
@@ -32,7 +33,7 @@ export default function App() {
         <PolicyArtifact />
         <SignedReceipt />
         <HookObjection />
-        <LiveDemoSection />
+        <LiveDemoCTA />
         <ClosingCTA />
       </main>
       <Footer />
@@ -153,12 +154,12 @@ function Nav() {
           <a className="transition hover:text-ink" href="#hook">
             Not a hook
           </a>
-          <a className="transition hover:text-ink" href="#demo">
+          <a className="transition hover:text-ink" href={APP_URL}>
             Live demo
           </a>
         </div>
         <div className="flex items-center gap-2">
-          <Btn href="#demo" size="sm">
+          <Btn href={APP_URL} size="sm">
             See it live →
           </Btn>
           <Btn href={GH} variant="outline" size="sm">
@@ -329,7 +330,7 @@ function Hero() {
       </p>
 
       <div className="mt-9 flex flex-wrap justify-center gap-3">
-        <Btn href="#demo" size="lg">
+        <Btn href={APP_URL} size="lg">
           See it live →
         </Btn>
         <Btn href={GH} variant="outline" size="lg">
@@ -865,17 +866,22 @@ function HookObjection() {
 /* ===================================================================== */
 /* LIVE DEMO                                                             */
 /* ===================================================================== */
-function LiveDemoSection() {
+function LiveDemoCTA() {
   return (
     <section className="mx-auto max-w-6xl px-5 py-16 sm:px-6">
       <SectionHead
         id="demo"
         eyebrow="Live demo"
         title="Run a real agent. Watch the gate decide."
-        lead="This is the real engine talking to the live enclave over the same origin. Prompt the agent or run a scenario, then re-verify every signature yourself. The explainer above stays put even if the API is asleep."
+        lead="The live console is the real engine talking to the enclave over the same origin. Prompt the agent or run a scenario, then re-verify every signature yourself — denials, hash-chain, and all."
       />
-      <div className="mt-9 rounded-xl border border-white/10 bg-surface-1/40 p-4 sm:p-6">
-        <Demo />
+      <div className="mt-9 flex flex-wrap items-center gap-4">
+        <Btn href={APP_URL} size="lg">
+          Open the live console →
+        </Btn>
+        <span className="font-mono text-[11px] text-ink-dim">
+          opens the full interactive console
+        </span>
       </div>
     </section>
   );
@@ -901,7 +907,7 @@ function ClosingCTA() {
             <span className="text-pass">Prove it.</span>
           </h2>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Btn href="#demo" size="lg">
+            <Btn href={APP_URL} size="lg">
               See it live →
             </Btn>
             <Btn href={GH} variant="outline" size="lg">
@@ -924,7 +930,7 @@ const FOOTER_LINKS: [string, [string, string][]][] = [
       ["The policy", "#policy"],
       ["The receipt", "#receipt"],
       ["Not a hook", "#hook"],
-      ["Live demo", "#demo"],
+      ["Live demo", APP_URL],
     ],
   ],
   [
