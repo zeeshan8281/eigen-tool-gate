@@ -1,861 +1,563 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { useEffect, useState, type ReactNode } from "react";
 import eigenIcon from "./assets/brand/eigen-icon.svg";
-import type {
-  AgentCatalog,
-  AgentRunResponse,
-  Attestation,
-  Catalog,
-  PolicyDecision,
-  TamperPreview,
-  VerifyChainResponse,
-} from "./types";
-import { Card, CopyButton, Panel, truncMid, VerdictChip } from "./ui";
+import eigenWordmark from "./assets/brand/eigen-wordmark.svg";
+import Demo from "./Demo";
 
-const POLL_MS = 2500;
+const GH = "https://github.com/zeeshan8281/eigen-tool-gate";
+const THREAT_MODEL = `${GH}#threat-model-summary`;
+const README = `${GH}#readme`;
+const VERIFY_TEE =
+  "https://verify-sepolia.eigencloud.xyz/app/0x6f6FF0B640CD262d3120B91cEB146E97620272f9";
+const EIGENCLOUD = "https://www.eigencloud.xyz";
 
 export default function App() {
-  const [online, setOnline] = useState<boolean | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [attest, setAttest] = useState<Attestation | null>(null);
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [agentCatalog, setAgentCatalog] = useState<AgentCatalog | null>(null);
-  const [policy, setPolicy] = useState<string>("");
-  const [decisions, setDecisions] = useState<PolicyDecision[]>([]);
-  const [chain, setChain] = useState<VerifyChainResponse | null>(null);
-  const [tamper, setTamper] = useState<TamperPreview | null>(null);
-
-  const [runningScenario, setRunningScenario] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(false);
-  const [tampering, setTampering] = useState(false);
-  const [policyOpen, setPolicyOpen] = useState(false);
-
-  // ---- bootstrap: session + static config -------------------------------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const h = await api.health();
-        if (cancelled) return;
-        setSessionId(h.sessionId);
-        setOnline(true);
-      } catch {
-        if (!cancelled) setOnline(false);
-      }
-      // best-effort static fetches (independent)
-      api.attestation().then((a) => !cancelled && setAttest(a)).catch(() => {});
-      api.catalog().then((c) => !cancelled && setCatalog(c)).catch(() => {});
-      api
-        .agentCatalog()
-        .then((c) => !cancelled && setAgentCatalog(c))
-        .catch(() => {});
-      api.policy().then((p) => !cancelled && setPolicy(p)).catch(() => {});
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // ---- polling: decisions + verify-chain --------------------------------
-  const refresh = useCallback(async (sid: string) => {
-    try {
-      const [d, c] = await Promise.all([
-        api.decisions(sid),
-        api.verifyChain(sid),
-      ]);
-      setDecisions(d.decisions ?? []);
-      setChain(c);
-      setOnline(true);
-    } catch {
-      setOnline(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    let stop = false;
-    const tick = () => !stop && refresh(sessionId);
-    tick();
-    const id = setInterval(tick, POLL_MS);
-    return () => {
-      stop = true;
-      clearInterval(id);
-    };
-  }, [sessionId, refresh]);
-
-  // ---- actions ----------------------------------------------------------
-  const runScenario = async (id: "a" | "b" | "c") => {
-    if (runningScenario) return;
-    setRunningScenario(id);
-    setTamper(null);
-    try {
-      await api.runScenario(id);
-    } catch {
-      /* surfaced via offline state */
-    } finally {
-      if (sessionId) await refresh(sessionId);
-      setRunningScenario(null);
-    }
-  };
-
-  const reverify = async () => {
-    if (!sessionId) return;
-    setVerifying(true);
-    try {
-      const c = await api.verifyChain(sessionId);
-      setChain(c);
-      setOnline(true);
-    } catch {
-      setOnline(false);
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const simulateTamper = async () => {
-    setTampering(true);
-    try {
-      const t = await api.tamperPreview();
-      setTamper(t);
-    } catch {
-      /* ignore */
-    } finally {
-      setTampering(false);
-    }
-  };
-
-  const attestUrl = useMemo(() => {
-    if (attest?.verifyUrl && attest?.eigenComputeDeploymentId) {
-      return `${attest.verifyUrl.replace(/\/$/, "")}/app/${attest.eigenComputeDeploymentId}`;
-    }
-    return null;
-  }, [attest]);
-
-  const teeMode = attest?.mode === "tee";
-
   return (
-    <div className="mx-auto min-h-screen w-full max-w-[1180px] px-5 pb-20 pt-6 sm:px-8">
-      <Header
-        teeMode={teeMode}
-        hasAttest={!!attest}
-        online={online}
-      />
-
-      <main className="mt-7 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        {/* LEFT COLUMN */}
-        <div className="flex flex-col gap-5">
-          <AttestationPanel attest={attest} attestUrl={attestUrl} />
-
-          <LiveAgentPanel
-            catalog={agentCatalog}
-            onAfterRun={() => sessionId && refresh(sessionId)}
-          />
-
-          <ScenarioPanel
-            catalog={catalog}
-            running={runningScenario}
-            onRun={runScenario}
-          />
-
-          <DecisionFeed decisions={decisions} online={online} />
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="flex flex-col gap-5">
-          <VerificationPanel
-            chain={chain}
-            verifying={verifying}
-            onReverify={reverify}
-          />
-
-          <TamperPanel
-            tamper={tamper}
-            tampering={tampering}
-            onSimulate={simulateTamper}
-          />
-
-          <PolicyViewer
-            policy={policy}
-            open={policyOpen}
-            onToggle={() => setPolicyOpen((v) => !v)}
-            policyHash={attest?.policyHash}
-          />
-        </div>
+    <div className="min-h-screen text-ink">
+      <Nav />
+      <main className="mx-auto max-w-6xl px-5 sm:px-6">
+        <Hero />
+        <StatsStrip />
+        <HowItWorks />
+        <NotAHook />
+        <Features />
+        <LiveDemoSection />
+        <ClosingCTA />
       </main>
-
-      <footer className="mt-10 border-t border-white/10 pt-5 text-[11px] text-ink-dim">
-        Verified Tool Gating · EigenCompute TEE policy gate · every decision is
-        hash-chained and signed inside the enclave.
-      </footer>
+      <Footer />
     </div>
   );
 }
 
 /* ===================================================================== */
-/* Header                                                                */
+/* Reusable bits                                                          */
 /* ===================================================================== */
-function Header({
-  teeMode,
-  hasAttest,
-  online,
+function Btn({
+  children,
+  href,
+  variant = "solid",
+  size = "md",
+  onClick,
 }: {
-  teeMode: boolean;
-  hasAttest: boolean;
-  online: boolean | null;
+  children: ReactNode;
+  href?: string;
+  variant?: "solid" | "outline";
+  size?: "sm" | "md" | "lg";
+  onClick?: () => void;
+}) {
+  const sz =
+    size === "sm"
+      ? "px-3 py-1.5 text-[13px]"
+      : size === "lg"
+        ? "px-5 py-2.5 text-[14px]"
+        : "px-4 py-2 text-[13px]";
+  const look =
+    variant === "solid"
+      ? "border border-eigen-accent/60 bg-eigen-accent/20 text-eigen-accent-soft hover:bg-eigen-accent/30 shadow-[0_0_30px_-10px_rgba(99,102,241,0.7)]"
+      : "border border-white/15 bg-white/5 text-ink hover:border-white/25 hover:bg-white/10";
+  const cls = `inline-flex items-center justify-center gap-2 rounded font-semibold transition ${sz} ${look}`;
+  if (href)
+    return (
+      <a
+        href={href}
+        className={cls}
+        {...(href.startsWith("http")
+          ? { target: "_blank", rel: "noreferrer" }
+          : {})}
+        onClick={onClick}
+      >
+        {children}
+      </a>
+    );
+  return (
+    <button className={cls} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function Kicker({ children }: { children: ReactNode }) {
+  return (
+    <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-eigen-accent-soft">
+      {children}
+    </div>
+  );
+}
+
+function Section({
+  id,
+  kicker,
+  title,
+  lead,
+  children,
+}: {
+  id?: string;
+  kicker: string;
+  title: ReactNode;
+  lead?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3.5">
-        <div className="flex h-11 w-11 items-center justify-center rounded border border-white/10 bg-gradient-to-br from-eigen-indigo to-eigen-indigo-2 text-eigen-accent-soft shadow-[0_0_30px_-8px_rgba(99,102,241,0.6)]">
-          <img src={eigenIcon} alt="Eigen" className="h-5 w-5 text-eigen-accent-soft" />
-        </div>
-        <div>
-          <h1 className="text-[19px] font-semibold leading-tight tracking-tight text-ink">
-            Verified Tool Gating
-          </h1>
-          <p className="text-[12px] text-ink-soft">
-            Part 4 · Verifiable pre-action policy enforcement inside an
-            EigenCompute TEE
-          </p>
-        </div>
-      </div>
+    <section id={id} className="scroll-mt-20 py-16 md:py-20">
+      <Kicker>{kicker}</Kicker>
+      <h2 className="mt-3 max-w-3xl text-[28px] font-bold leading-[1.12] tracking-tight md:text-[36px]">
+        {title}
+      </h2>
+      {lead && (
+        <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-ink-soft">
+          {lead}
+        </p>
+      )}
+      <div className="mt-9">{children}</div>
+    </section>
+  );
+}
 
-      <div className="flex items-center gap-2.5">
-        <ConnDot online={online} />
-        {hasAttest ? (
-          <span
-            className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${
-              teeMode
-                ? "border-pass/40 bg-pass/10 text-pass"
-                : "border-warn/40 bg-warn/10 text-warn"
-            }`}
+/* ===================================================================== */
+/* Nav                                                                   */
+/* ===================================================================== */
+function Nav() {
+  return (
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-surface-0/70 backdrop-blur-xl">
+      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
+        <a href="#top" className="flex items-center gap-3">
+          <img src={eigenWordmark} alt="Eigen" className="h-5 w-auto" />
+          <span className="text-ink-dim">/</span>
+          <span className="text-[14px] font-medium">Tool Gating</span>
+        </a>
+        <div className="hidden items-center gap-7 text-[13px] text-ink-soft lg:flex">
+          <a className="transition hover:text-ink" href="#how">
+            How it works
+          </a>
+          <a className="transition hover:text-ink" href="#why">
+            Not just a hook
+          </a>
+          <a className="transition hover:text-ink" href="#demo">
+            Live demo
+          </a>
+          <a
+            className="transition hover:text-ink"
+            href={GH}
+            target="_blank"
+            rel="noreferrer"
           >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${teeMode ? "bg-pass" : "bg-warn"}`}
-            />
-            {teeMode ? "TEE" : "DEV"}
-          </span>
-        ) : (
-          <span className="rounded border border-white/10 px-2.5 py-1 text-[11px] text-ink-dim shimmer">
-            …
-          </span>
-        )}
-      </div>
+            GitHub
+          </a>
+        </div>
+        <div className="flex items-center gap-2">
+          <Btn href="#demo" size="sm">
+            Open demo →
+          </Btn>
+          <Btn href={GH} variant="outline" size="sm">
+            GitHub ★
+          </Btn>
+        </div>
+      </nav>
     </header>
   );
 }
 
-function ConnDot({ online }: { online: boolean | null }) {
-  if (online === null)
-    return <span className="text-[11px] text-ink-dim">connecting…</span>;
+/* ===================================================================== */
+/* Hero                                                                  */
+/* ===================================================================== */
+type FeedLine = { text: string; cls?: string; tail?: string; tailCls?: string };
+
+const HERO_FEED: FeedLine[] = [
+  { text: 'you → agent', tail: '"research EigenLayer, then clean up old files"', tailCls: "text-ink" },
+  { text: "agent → web_search", tail: "ALLOW", tailCls: "text-pass" },
+  { text: "agent → file_write", tail: "ALLOW", tailCls: "text-pass" },
+  { text: "agent → db_query (SELECT)", tail: "ALLOW", tailCls: "text-pass" },
+  { text: "agent → file_read /etc/passwd", tail: "DENY · path", tailCls: "text-deny" },
+  { text: "agent → shell_exec", tail: "DENY · blocked", tailCls: "text-deny" },
+  { text: "agent → file_delete", tail: "DENY · needs human approval", tailCls: "text-deny" },
+  { text: "# every decision signed in the enclave, before the tool runs", cls: "text-ink-dim" },
+];
+
+function HeroFeed() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (n >= HERO_FEED.length) {
+      const t = setTimeout(() => setN(0), 4200);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setN((x) => x + 1), n === 0 ? 700 : 520);
+    return () => clearTimeout(t);
+  }, [n]);
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-dim">
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          online ? "bg-pass live-dot" : "bg-deny"
-        }`}
-      />
-      {online ? "live" : "reconnecting…"}
-    </span>
+    <div className="rounded-lg border border-white/10 bg-surface-1/70 shadow-[0_0_60px_-20px_rgba(99,102,241,0.5)] backdrop-blur-sm">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 font-mono text-[11px] text-ink-dim">
+        <span>live feed · policy gate</span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-eigen-accent-soft live-dot" />
+          inside the TEE
+        </span>
+      </div>
+      <div className="min-h-[300px] space-y-2 p-4 font-mono text-[12.5px] leading-relaxed">
+        {HERO_FEED.slice(0, n).map((l, i) => (
+          <div key={i} className="row-in flex flex-wrap items-baseline gap-x-2">
+            <span className={l.cls ?? "text-ink-soft"}>{l.text}</span>
+            {l.tail && (
+              <span className={`font-semibold ${l.tailCls ?? "text-ink"}`}>
+                {l.tail}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Hero() {
+  return (
+    <section
+      id="top"
+      className="grid items-center gap-12 py-16 md:grid-cols-[1.05fr_0.95fr] md:py-24"
+    >
+      <div>
+        <span className="inline-flex rounded border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[11px] text-ink-soft">
+          Built on EigenCompute · Intel TDX TEE · verifiable
+        </span>
+        <h1 className="mt-6 text-[40px] font-bold leading-[1.04] tracking-tight md:text-[58px]">
+          Your agent can only do
+          <br />
+          what the policy allows.
+          <br />
+          <span className="text-ink-dim">And anyone can prove it.</span>
+        </h1>
+        <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-ink-soft">
+          Every tool call is intercepted inside a verifiable{" "}
+          <span className="font-medium text-ink">Intel TDX enclave</span>. Every{" "}
+          <span className="font-medium text-pass">ALLOW</span> and{" "}
+          <span className="font-medium text-deny">DENY</span> is{" "}
+          <span className="font-medium text-ink">signed and hash-chained</span>{" "}
+          before the tool runs. The operator can't disable the gate, the agent
+          can't hide a denial, and you can{" "}
+          <span className="font-medium text-ink">
+            re-verify the whole history yourself
+          </span>
+          .
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Btn href="#demo" size="lg">
+            See it live →
+          </Btn>
+          <Btn href={THREAT_MODEL} variant="outline" size="lg">
+            Read the threat model
+          </Btn>
+        </div>
+      </div>
+      <HeroFeed />
+    </section>
   );
 }
 
 /* ===================================================================== */
-/* Attestation                                                           */
+/* Stats strip                                                           */
 /* ===================================================================== */
-function AttestationPanel({
-  attest,
-  attestUrl,
-}: {
-  attest: Attestation | null;
-  attestUrl: string | null;
-}) {
+const STATS: [string, string][] = [
+  ["TDX", "hardware enclave · every decision signed"],
+  ["0", "ways for the operator to skip the gate"],
+  ["1", "policy hash · sealed into the attestation"],
+  ["100%", "of denials persisted before the error is raised"],
+];
+
+function StatsStrip() {
   return (
-    <Panel
-      title="Attestation"
-      desc="Cryptographic identity of the enclave enforcing the policy."
-      right={
-        attestUrl ? (
-          <a
-            href={attestUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0 rounded border border-eigen-accent/40 bg-eigen-accent/10 px-2.5 py-1 text-[11px] font-medium text-eigen-accent-soft transition hover:bg-eigen-accent/20"
+    <section className="pb-2">
+      <div className="grid grid-cols-2 divide-white/10 overflow-hidden rounded-lg border border-white/10 bg-surface-1/60 md:grid-cols-4 md:divide-x">
+        {STATS.map(([n, l]) => (
+          <div key={l} className="border-t border-white/10 px-6 py-6 text-center first:border-t-0 md:border-t-0">
+            <div className="text-[30px] font-bold tracking-tight text-eigen-accent-soft md:text-[38px]">
+              {n}
+            </div>
+            <div className="mt-1 text-[12px] leading-relaxed text-ink-soft">
+              {l}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ===================================================================== */
+/* How it works + Architecture SVG                                       */
+/* ===================================================================== */
+function GateArchitectureSVG() {
+  return (
+    <svg
+      viewBox="0 0 820 460"
+      className="w-full"
+      role="img"
+      aria-label="Verified Tool Gating architecture"
+    >
+      <defs>
+        <marker id="g-ah" markerWidth="9" markerHeight="9" refX="5" refY="4.5" orient="auto">
+          <path d="M1 1 L8 4.5 L1 8 Z" fill="currentColor" />
+        </marker>
+        <radialGradient id="g-glow" cx="0.5" cy="0.5" r="0.7">
+          <stop offset="0" stopColor="#6366f1" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#6366f1" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* enclave boundary */}
+      <rect x="208" y="40" width="404" height="306" rx="16" fill="url(#g-glow)" stroke="#6366f1" strokeOpacity="0.5" strokeWidth="1.5" strokeDasharray="6 5" />
+      <text x="230" y="66" fontFamily="ui-monospace, monospace" fontSize="11" letterSpacing="2" fill="#818cf8">
+        INTEL TDX ENCLAVE · EIGENCOMPUTE
+      </text>
+
+      {/* agent */}
+      <g>
+        <rect x="24" y="150" width="132" height="56" rx="12" fill="#141417" stroke="#818cf8" strokeOpacity="0.5" />
+        <circle cx="52" cy="178" r="5" fill="#818cf8" />
+        <text x="68" y="183" fontFamily="ui-monospace, monospace" fontSize="14" fill="#ededef">agent</text>
+        <text x="24" y="232" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#737373">a real Claude model</text>
+      </g>
+
+      {/* agent -> gate */}
+      <g style={{ color: "#818cf8" }}>
+        <line x1="156" y1="178" x2="280" y2="178" stroke="#818cf8" strokeOpacity="0.7" strokeWidth="1.6" markerEnd="url(#g-ah)" />
+        <text x="170" y="168" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#a3a3a3">tool call</text>
+      </g>
+
+      {/* the gate */}
+      <rect x="282" y="138" width="148" height="80" rx="12" fill="#171717" stroke="#6366f1" strokeOpacity="0.8" strokeWidth="1.6" />
+      <text x="356" y="170" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="13" fontWeight="600" fill="#fafafa">Policy Gate</text>
+      <text x="356" y="190" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#a3a3a3">deny-by-default</text>
+      <text x="356" y="206" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10" fill="#a3a3a3">in-process interceptor</text>
+
+      {/* gate -> allow -> tool */}
+      <g style={{ color: "#34d399" }}>
+        <line x1="430" y1="160" x2="556" y2="118" stroke="#34d399" strokeOpacity="0.75" strokeWidth="1.6" markerEnd="url(#g-ah)" />
+        <text x="452" y="128" fontFamily="ui-monospace, monospace" fontSize="11" fontWeight="600" fill="#34d399">ALLOW</text>
+      </g>
+      <rect x="556" y="92" width="120" height="48" rx="10" fill="#141417" stroke="#34d399" strokeOpacity="0.45" />
+      <text x="616" y="121" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="12" fill="#ededef">real tool</text>
+
+      {/* gate -> deny -> blocked */}
+      <g style={{ color: "#f87171" }}>
+        <line x1="430" y1="196" x2="556" y2="238" stroke="#f87171" strokeOpacity="0.75" strokeWidth="1.6" markerEnd="url(#g-ah)" />
+        <text x="452" y="234" fontFamily="ui-monospace, monospace" fontSize="11" fontWeight="600" fill="#f87171">DENY</text>
+      </g>
+      <rect x="556" y="214" width="120" height="48" rx="10" fill="#141417" stroke="#f87171" strokeOpacity="0.45" />
+      <text x="616" y="243" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="12" fill="#ededef">blocked</text>
+
+      {/* gate -> signed log (writes BEFORE verdict takes effect) */}
+      <g style={{ color: "#818cf8" }}>
+        <line x1="356" y1="218" x2="356" y2="286" stroke="#818cf8" strokeOpacity="0.6" strokeWidth="1.6" markerEnd="url(#g-ah)" />
+      </g>
+      <rect x="244" y="288" width="324" height="44" rx="10" fill="#171717" stroke="#ffffff1a" />
+      {[0, 1, 2, 3, 4].map((i) => (
+        <rect key={i} x={262 + i * 58} y="300" width="44" height="20" rx="4" fill={i % 2 ? "#6366f1" : "#312e81"} fillOpacity={i % 2 ? 0.55 : 0.75} />
+      ))}
+      <text x="406" y="356" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#a3a3a3">
+        signed hash-chained log · written before the verdict takes effect
+      </text>
+
+      {/* policy -> sha256 -> attestation */}
+      <g style={{ color: "#737373" }}>
+        <rect x="24" y="404" width="150" height="38" rx="8" fill="#141417" stroke="#ffffff14" />
+        <text x="99" y="428" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11.5" fill="#ededef">policy.yaml</text>
+        <line x1="174" y1="423" x2="246" y2="423" stroke="#737373" strokeOpacity="0.7" strokeWidth="1.4" markerEnd="url(#g-ah)" />
+        <text x="180" y="414" fontFamily="ui-monospace, monospace" fontSize="10" fill="#818cf8">sha256</text>
+        <rect x="248" y="404" width="150" height="38" rx="8" fill="#141417" stroke="#6366f1" strokeOpacity="0.4" />
+        <text x="323" y="428" textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize="11.5" fill="#ededef">attestation</text>
+        <text x="412" y="428" fontFamily="ui-monospace, monospace" fontSize="10.5" fill="#737373">← anyone can re-check the hash</text>
+      </g>
+    </svg>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <Section
+      id="how"
+      kicker="How it works"
+      title="One gate. Every tool call passes through it. Nothing gets around it."
+      lead="The gate is an in-process interceptor inside the enclave — not a sidecar the agent can route around. Each call is matched against a deny-by-default policy, signed, and written to an append-only hash-chained log before the verdict takes effect."
+    >
+      <div className="overflow-hidden rounded-lg border border-white/10 bg-surface-1/60 p-6 md:p-8">
+        <GateArchitectureSVG />
+      </div>
+    </Section>
+  );
+}
+
+/* ===================================================================== */
+/* Not just a hook — comparison table                                    */
+/* ===================================================================== */
+const COMPARE: [string, string, string][] = [
+  ["Where it runs", "your app, on infra you trust", "inside an attested Intel TDX enclave"],
+  ["Operator can skip it", "yes — patch it out or disable it", "no — it's measured into the attestation"],
+  ["Proof a denial happened", "none", "signed, hash-chained, persisted before the error"],
+  ["Swap in a weaker policy", "silent", "changes the attestation hash — verifiers notice"],
+  ["Audit after the fact", "trust the logs", "re-verify every signature yourself"],
+];
+
+function NotAHook() {
+  return (
+    <Section
+      id="why"
+      kicker={'"Isn\'t this just a before_tool_call hook?"'}
+      title="A hook runs on trust. A gate runs on proof."
+      lead="Frameworks already have tool-call hooks. They run in userspace on infrastructure you have to trust — and there's no proof they ran."
+    >
+      <div className="overflow-hidden rounded-lg border border-white/10">
+        <div className="grid grid-cols-[0.85fr_1fr_1fr] border-b border-white/10 bg-surface-1/60 font-mono text-[11px] uppercase tracking-wider text-ink-dim">
+          <div className="px-4 py-3 sm:px-5"> </div>
+          <div className="px-4 py-3 sm:px-5">Userspace hook</div>
+          <div className="border-l border-white/10 px-4 py-3 text-eigen-accent-soft sm:px-5">
+            Verified Tool Gating
+          </div>
+        </div>
+        {COMPARE.map(([label, hook, gate], i) => (
+          <div
+            key={label}
+            className={`grid grid-cols-[0.85fr_1fr_1fr] text-[13px] ${
+              i < COMPARE.length - 1 ? "border-b border-white/10" : ""
+            }`}
           >
-            View attestation ↗
-          </a>
-        ) : undefined
-      }
-    >
-      {!attest ? (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[58px] rounded border border-white/10 bg-surface-2/60 shimmer"
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          <Card label="TEE address">
-            <span className="font-mono text-[12px]">
-              {truncMid(attest.teeAddress, 10, 8)}
-            </span>
-          </Card>
-          <Card label="Policy hash">
-            <span className="inline-flex items-center font-mono text-[12px]">
-              {truncMid(attest.policyHash, 8, 6)}
-              <CopyButton value={attest.policyHash} />
-            </span>
-          </Card>
-          <Card label="Image digest">
-            <span className="inline-flex items-center font-mono text-[12px]">
-              {truncMid(attest.imageDigest, 8, 6)}
-              <CopyButton value={attest.imageDigest} />
-            </span>
-          </Card>
-          <Card label="App ID">
-            <span className="font-mono text-[12px]">
-              {truncMid(attest.eigenComputeDeploymentId, 8, 6)}
-            </span>
-          </Card>
-          <Card label="KMS fingerprint">
-            <span className="font-mono text-[12px]">
-              {truncMid(attest.kmsKeyFingerprint, 8, 6)}
-            </span>
-          </Card>
-          <Card label="Platform">
-            <span className="text-[12px]">{attest.platform ?? "—"}</span>
-          </Card>
-        </div>
-      )}
-    </Panel>
+            <div className="px-4 py-3.5 font-medium text-ink/90 sm:px-5">
+              {label}
+            </div>
+            <div className="px-4 py-3.5 text-ink-soft sm:px-5">{hook}</div>
+            <div className="border-l border-white/10 px-4 py-3.5 text-ink sm:px-5">
+              {gate}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }
 
 /* ===================================================================== */
-/* Live Agent                                                            */
+/* Features                                                              */
 /* ===================================================================== */
-function LiveAgentPanel({
-  catalog,
-  onAfterRun,
-}: {
-  catalog: AgentCatalog | null;
-  onAfterRun: () => void;
-}) {
-  const [prompt, setPrompt] = useState("");
-  const [filled, setFilled] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<AgentRunResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const FEATURES: [string, string][] = [
+  ["Deny-by-default policy", "Plain YAML a non-cryptographer can read. Anything not explicitly allowed is blocked."],
+  ["Runs in an Intel TDX TEE", "The gate is compiled into the enclave image; the signing key is sealed and never leaves."],
+  ["Signed, hash-chained decisions", "Every ALLOW and DENY is secp256k1-signed and linked to the last — tamper-evident."],
+  ["A real agent, real tools", "A live Claude model calls real tools — web search, files, SQL — each one gated before it runs."],
+  ["Human-in-the-loop", "Destructive actions like file deletion require explicit human approval to proceed."],
+  ["Verify it yourself", "Re-check every signature and the whole chain in your browser. No trust in the server."],
+];
 
-  // Pre-fill the prompt with the first example once the catalog loads.
-  useEffect(() => {
-    if (!filled && catalog?.examples?.length) {
-      setPrompt(catalog.examples[0]);
-      setFilled(true);
-    }
-  }, [catalog, filled]);
-
-  const llmReady = catalog?.llmConfigured === true;
-  const canRun = llmReady && !running && prompt.trim().length > 0;
-
-  const run = async () => {
-    if (!canRun) return;
-    setRunning(true);
-    setError(null);
-    setResult(null);
-    try {
-      const r = await api.agentRun(prompt.trim());
-      setResult(r);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(
-        msg.includes("503")
-          ? "Agent unavailable (503) — the LLM may not be configured."
-          : `Agent run failed — ${msg}`,
-      );
-    } finally {
-      setRunning(false);
-      // The agent's tool calls landed as new signed decisions in the same
-      // chain — refresh the live feed + verification panel.
-      onAfterRun();
-    }
-  };
-
+function Features() {
   return (
-    <Panel
-      title="Run a real agent"
-      desc="A real Claude model decides which tools to call. Every call is authorized by the policy gate before it runs."
-      right={
-        catalog?.model ? (
-          <span className="shrink-0 rounded-sm border border-eigen-accent/30 bg-eigen-accent/10 px-2 py-0.5 font-mono text-[10px] text-eigen-accent-soft">
-            {catalog.model}
-          </span>
-        ) : undefined
-      }
-    >
-      {/* example chips */}
-      {!!catalog?.examples?.length && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {catalog.examples.map((ex, i) => (
-            <button
-              key={i}
-              type="button"
-              disabled={running}
-              onClick={() => setPrompt(ex)}
-              className="max-w-full truncate rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-ink-soft transition hover:border-eigen-accent/50 hover:text-eigen-accent-soft disabled:cursor-wait disabled:opacity-60"
-              title={ex}
-            >
-              {ex}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        disabled={running}
-        rows={3}
-        placeholder="Ask the agent to do something…"
-        className="w-full resize-y rounded border border-white/10 bg-black/40 px-3 py-2.5 font-sans text-[13px] text-ink outline-none transition placeholder:text-ink-dim focus:border-eigen-accent/60 disabled:opacity-60"
-      />
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <button
-          onClick={run}
-          disabled={!canRun}
-          className="inline-flex items-center gap-2 rounded border border-eigen-accent/50 bg-eigen-accent/15 px-4 py-2 text-[13px] font-semibold text-eigen-accent-soft transition hover:bg-eigen-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {running && (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-[2px] border-eigen-accent-soft/40 border-t-eigen-accent-soft" />
-          )}
-          {running ? "Running agent… (up to 60s)" : "Run agent"}
-        </button>
-
-        {!llmReady && catalog && (
-          <span className="text-[11px] text-ink-dim">
-            LLM not configured in this deployment
-          </span>
-        )}
-      </div>
-
-      {error && (
-        <div className="row-in mt-3 rounded border border-deny/50 bg-deny/10 px-3 py-2 text-[12px] text-deny">
-          {error}
-        </div>
-      )}
-
-      {result && (
-        <div className="row-in mt-4 space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-soft">
-            <span className="rounded-sm border border-white/10 bg-surface-2/60 px-2 py-0.5 font-mono">
-              {result.model}
-            </span>
-            <span className="rounded-sm border border-white/10 bg-surface-2/60 px-2 py-0.5 font-mono">
-              {result.stepCount} step{result.stepCount === 1 ? "" : "s"}
-            </span>
-            <span className="font-mono">
-              {result.toolCalls.length} tool call
-              {result.toolCalls.length === 1 ? "" : "s"}
-            </span>
+    <Section kicker="What you get" title="A gate you can prove, not a hook you hope ran.">
+      <div className="grid gap-4 md:grid-cols-3">
+        {FEATURES.map(([t, b]) => (
+          <div
+            key={t}
+            className="rounded-lg border border-white/10 bg-surface-1/60 p-6 transition hover:border-eigen-accent/40"
+          >
+            <h3 className="text-[15px] font-semibold">{t}</h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">{b}</p>
           </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
 
-          {result.toolCalls.length > 0 && (
-            <div className="space-y-1.5">
-              {result.toolCalls.map((c, i) => (
-                <div
-                  key={i}
-                  className="flex flex-wrap items-center gap-2 rounded border border-white/10 bg-surface-2/50 px-2.5 py-2"
-                >
-                  <VerdictChip verdict={c.verdict} />
-                  <span className="font-mono text-[12px] text-ink">
-                    {c.tool}
-                  </span>
-                  {c.verdict === "DENY" && c.reasonCode && (
-                    <span className="rounded-sm bg-deny/15 px-1.5 py-0.5 font-mono text-[10px] text-deny">
-                      {c.reasonCode}
-                    </span>
-                  )}
-                </div>
+/* ===================================================================== */
+/* Live demo section                                                     */
+/* ===================================================================== */
+function LiveDemoSection() {
+  return (
+    <Section
+      id="demo"
+      kicker="Live demo"
+      title="Run a real agent. Watch the gate decide."
+      lead="This is the real engine — talking to the live enclave over the same origin. Run a scenario or prompt the agent, then re-verify every signature yourself."
+    >
+      <div className="rounded-lg border border-white/10 bg-surface-1/40 p-4 sm:p-6">
+        <Demo />
+      </div>
+    </Section>
+  );
+}
+
+/* ===================================================================== */
+/* Closing CTA                                                           */
+/* ===================================================================== */
+function ClosingCTA() {
+  return (
+    <section className="py-20">
+      <div className="flex flex-col items-center rounded-lg border border-white/10 bg-surface-1/60 px-8 py-16 text-center shadow-[0_0_80px_-30px_rgba(99,102,241,0.6)]">
+        <Kicker>Verified Tool Gating</Kicker>
+        <h2 className="mt-4 max-w-2xl text-[30px] font-bold tracking-tight md:text-[38px]">
+          Stop trusting that your agent behaved.{" "}
+          <span className="text-ink-dim">Prove it.</span>
+        </h2>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Btn href="#demo" size="lg">
+            Open the live demo →
+          </Btn>
+          <Btn href={GH} variant="outline" size="lg">
+            GitHub
+          </Btn>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ===================================================================== */
+/* Footer                                                                */
+/* ===================================================================== */
+const FOOTER: [string, [string, string][]][] = [
+  ["Product", [["How it works", "#how"], ["Not just a hook", "#why"], ["Live demo", "#demo"]]],
+  ["Developers", [["GitHub", GH], ["README", README]]],
+  ["More", [["Verify the TEE →", VERIFY_TEE], ["EigenCloud →", EIGENCLOUD]]],
+];
+
+function Footer() {
+  return (
+    <footer className="mt-10 border-t border-white/10">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <img src={eigenIcon} alt="Eigen" className="h-7 w-auto text-eigen-accent-soft" />
+            <span className="text-[17px] font-semibold">Verified Tool Gating</span>
+          </div>
+          <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-ink-soft">
+            Verifiable, tamper-proof authorization for AI agents — part 4 of the
+            EigenCloud Agent Observability series.
+          </p>
+        </div>
+        {FOOTER.map(([h, links]) => (
+          <div key={h}>
+            <div className="font-mono text-[11px] uppercase tracking-wider text-ink-dim">
+              {h}
+            </div>
+            <ul className="mt-4 space-y-2.5 text-[13px]">
+              {links.map(([label, href]) => (
+                <li key={label}>
+                  <a
+                    className="text-ink/80 transition hover:text-ink"
+                    href={href}
+                    {...(href.startsWith("http")
+                      ? { target: "_blank", rel: "noreferrer" }
+                      : {})}
+                  >
+                    {label}
+                  </a>
+                </li>
               ))}
-            </div>
-          )}
-
-          <div>
-            <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-dim">
-              Agent answer
-            </div>
-            <div className="whitespace-pre-wrap rounded border border-white/10 bg-black/40 px-3.5 py-3 text-[13px] leading-relaxed text-ink">
-              {result.finalText || "—"}
-            </div>
+            </ul>
           </div>
-        </div>
-      )}
-    </Panel>
-  );
-}
-
-/* ===================================================================== */
-/* Scenario runner                                                       */
-/* ===================================================================== */
-const SCENARIO_META: Record<
-  string,
-  { tag: string; accent: string }
-> = {
-  a: { tag: "A", accent: "from-pass/20 to-pass/5 border-pass/30" },
-  b: { tag: "B", accent: "from-deny/20 to-deny/5 border-deny/30" },
-  c: { tag: "C", accent: "from-eigen-accent/20 to-eigen-accent/5 border-eigen-accent/30" },
-};
-
-function ScenarioPanel({
-  catalog,
-  running,
-  onRun,
-}: {
-  catalog: Catalog | null;
-  running: string | null;
-  onRun: (id: "a" | "b" | "c") => void;
-}) {
-  const scenarios = catalog?.scenarios ?? [
-    { id: "a", title: "Legitimate research", verdictHint: "ALLOW" },
-    { id: "b", title: "Prompt injection", verdictHint: "DENY" },
-    { id: "c", title: "Spending + HITL", verdictHint: "MIXED" },
-  ];
-
-  return (
-    <Panel
-      title="Scenario runner"
-      desc="Drive the agent through a pre-built sequence; each tool call is gated, signed, and chained."
-    >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {scenarios.slice(0, 3).map((s) => {
-          const meta = SCENARIO_META[s.id] ?? SCENARIO_META.a;
-          const busy = running === s.id;
-          const disabled = !!running;
-          return (
-            <button
-              key={s.id}
-              onClick={() => onRun(s.id as "a" | "b" | "c")}
-              disabled={disabled}
-              className={`group relative overflow-hidden rounded border bg-gradient-to-br ${meta.accent} p-3.5 text-left transition disabled:opacity-60 ${
-                disabled ? "cursor-wait" : "hover:brightness-125"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-6 w-6 items-center justify-center rounded-sm border border-white/15 bg-black/30 font-mono text-[12px] font-semibold text-ink">
-                  {meta.tag}
-                </span>
-                {s.verdictHint && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-ink-soft">
-                    {s.verdictHint}
-                  </span>
-                )}
-              </div>
-              <div className="mt-3 text-[13px] font-medium leading-snug text-ink">
-                {s.title}
-              </div>
-              <div className="mt-2 text-[11px] text-ink-soft">
-                {busy ? "running…" : "run scenario →"}
-              </div>
-              {busy && (
-                <span className="absolute inset-x-0 bottom-0 h-0.5 bg-eigen-accent-soft/70 shimmer" />
-              )}
-            </button>
-          );
-        })}
+        ))}
       </div>
-    </Panel>
-  );
-}
-
-/* ===================================================================== */
-/* Live decision feed                                                    */
-/* ===================================================================== */
-function DecisionFeed({
-  decisions,
-  online,
-}: {
-  decisions: PolicyDecision[];
-  online: boolean | null;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const prevLen = useRef(0);
-
-  const ordered = useMemo(
-    () => [...decisions].sort((a, b) => a.sequenceNumber - b.sequenceNumber),
-    [decisions],
-  );
-
-  useEffect(() => {
-    if (ordered.length > prevLen.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-    prevLen.current = ordered.length;
-  }, [ordered.length]);
-
-  return (
-    <Panel
-      title="Live decision feed"
-      desc="Signed, hash-chained policy decisions — newest at the bottom."
-      right={
-        <span className="rounded-sm border border-white/10 px-2 py-0.5 font-mono text-[11px] text-ink-soft">
-          {ordered.length} decisions
-        </span>
-      }
-    >
-      <div
-        ref={scrollRef}
-        className="max-h-[360px] min-h-[140px] space-y-1.5 overflow-y-auto pr-1"
-      >
-        {ordered.length === 0 ? (
-          <div className="flex h-[140px] items-center justify-center text-[12px] text-ink-dim">
-            {online === false
-              ? "connecting…"
-              : "No decisions yet — run a scenario above."}
-          </div>
-        ) : (
-          ordered.map((d) => <DecisionRow key={d.decisionId} d={d} />)
-        )}
-      </div>
-    </Panel>
-  );
-}
-
-function DecisionRow({ d }: { d: PolicyDecision }) {
-  return (
-    <div className="row-in flex items-start gap-2.5 rounded border border-white/10 bg-surface-2/50 px-2.5 py-2 transition hover:border-white/20">
-      <span className="mt-0.5 w-7 shrink-0 text-right font-mono text-[11px] text-ink-dim">
-        #{d.sequenceNumber}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <VerdictChip verdict={d.verdict} />
-          <span className="truncate font-mono text-[12px] text-ink">
-            {d.toolName}
-          </span>
-          {d.reasonCode && (
-            <span className="rounded-sm bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-ink-soft">
-              {d.reasonCode}
-            </span>
-          )}
-        </div>
-        {d.constraintDetails && (
-          <div className="mt-1 truncate text-[11px] text-ink-dim">
-            {d.constraintDetails}
-          </div>
-        )}
-        <div className="mt-1 flex items-center gap-1.5">
-          <span className="text-[10px] text-pass">🔒 signed</span>
-          <span className="font-mono text-[10px] text-ink-dim">
-            {truncMid(d.signature, 10, 8)}
-          </span>
+      <div className="border-t border-white/10">
+        <div className="mx-auto max-w-6xl px-5 py-6 font-mono text-[11px] text-ink-dim sm:px-6">
+          Verified Tool Gating · Intel TDX · EigenCompute · every tool call,
+          gated
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ===================================================================== */
-/* Verification                                                          */
-/* ===================================================================== */
-function VerificationPanel({
-  chain,
-  verifying,
-  onReverify,
-}: {
-  chain: VerifyChainResponse | null;
-  verifying: boolean;
-  onReverify: () => void;
-}) {
-  const valid = chain?.valid === true;
-  const has = !!chain;
-
-  return (
-    <Panel
-      title="Chain verification"
-      desc="Re-checks every signature and prevHash link across the session."
-      right={
-        <button
-          onClick={onReverify}
-          disabled={verifying}
-          className="shrink-0 rounded border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-ink transition hover:border-eigen-accent/50 hover:text-eigen-accent-soft disabled:cursor-wait disabled:opacity-60"
-        >
-          {verifying ? "verifying…" : "Re-verify"}
-        </button>
-      }
-    >
-      <div
-        className={`rounded border p-4 text-center ${
-          !has
-            ? "border-white/10 bg-surface-2/60"
-            : valid
-              ? "border-pass/40 bg-pass/10"
-              : "border-deny/50 bg-deny/10"
-        }`}
-      >
-        <div
-          className={`text-[22px] font-bold tracking-tight ${
-            !has ? "text-ink-dim" : valid ? "text-pass" : "text-deny"
-          }`}
-        >
-          {!has ? "—" : valid ? "CHAIN VALID ✓" : "BROKEN ✗"}
-        </div>
-        <div className="mt-1 text-[11px] text-ink-soft">
-          {!has
-            ? "awaiting verification"
-            : valid
-              ? "all signatures + hash links intact"
-              : `broken at sequence #${chain?.brokenAt ?? "?"}`}
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-2.5">
-        <Stat label="Total" value={chain?.chainLength ?? 0} />
-        <Stat label="Allow" value={chain?.allowCount ?? 0} tone="pass" />
-        <Stat label="Deny" value={chain?.denyCount ?? 0} tone="deny" />
-      </div>
-
-      {(chain?.gaps?.length || chain?.brokenAt != null) && (
-        <div className="mt-3 space-y-1 rounded border border-deny/30 bg-deny/5 p-2.5 text-[11px]">
-          {chain?.gaps && chain.gaps.length > 0 && (
-            <div className="text-deny">
-              Sequence gaps: {chain.gaps.join(", ")}
-            </div>
-          )}
-          {chain?.brokenAt != null && (
-            <div className="text-deny">Broken at: #{chain.brokenAt}</div>
-          )}
-          {chain?.errors?.map((e, i) => (
-            <div key={i} className="text-ink-soft">
-              {e}
-            </div>
-          ))}
-        </div>
-      )}
-    </Panel>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: "pass" | "deny";
-}) {
-  const color =
-    tone === "pass" ? "text-pass" : tone === "deny" ? "text-deny" : "text-ink";
-  return (
-    <div className="rounded border border-white/10 bg-surface-2/60 px-2 py-2 text-center">
-      <div className={`font-mono text-[18px] font-semibold ${color}`}>
-        {value}
-      </div>
-      <div className="text-[10px] uppercase tracking-wider text-ink-dim">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-/* ===================================================================== */
-/* Tamper demo                                                           */
-/* ===================================================================== */
-function TamperPanel({
-  tamper,
-  tampering,
-  onSimulate,
-}: {
-  tamper: TamperPreview | null;
-  tampering: boolean;
-  onSimulate: () => void;
-}) {
-  return (
-    <Panel
-      title="Tamper demo"
-      desc="Flip one decision and watch verification reject the forged chain."
-    >
-      <button
-        onClick={onSimulate}
-        disabled={tampering}
-        className="w-full rounded border border-deny/50 bg-deny/15 px-3 py-2.5 text-[13px] font-semibold text-deny transition hover:bg-deny/25 disabled:cursor-wait disabled:opacity-60"
-      >
-        {tampering ? "simulating…" : "⚠ Simulate tampering"}
-      </button>
-
-      {tamper && (
-        <div className="row-in mt-3 rounded border border-deny/50 bg-deny/10 p-3.5">
-          <div className="text-[13px] font-semibold text-deny">
-            Forged decision #{tamper.tamperedSequence}:{" "}
-            <span className="font-mono">
-              {tamper.flippedFrom} → {tamper.flippedTo}
-            </span>
-          </div>
-          <div className="mt-2 flex items-center gap-2 text-[12px]">
-            <span className="rounded-sm bg-pass/15 px-1.5 py-0.5 text-pass">
-              before: {tamper.before.valid ? "VALID ✓" : "broken"}
-            </span>
-            <span className="text-ink-dim">→</span>
-            <span className="rounded-sm bg-deny/20 px-1.5 py-0.5 font-semibold text-deny">
-              after: {tamper.after.valid ? "valid" : "FAILS ✗"}
-            </span>
-          </div>
-          <div className="mt-2.5 rounded-sm border border-deny/30 bg-black/30 px-2.5 py-2 font-mono text-[11px] text-deny">
-            Chain verification now FAILS at #{tamper.after.brokenAt ?? "?"}:{" "}
-            {tamper.after.error}
-          </div>
-        </div>
-      )}
-    </Panel>
-  );
-}
-
-/* ===================================================================== */
-/* Policy viewer                                                         */
-/* ===================================================================== */
-function PolicyViewer({
-  policy,
-  open,
-  onToggle,
-  policyHash,
-}: {
-  policy: string;
-  open: boolean;
-  onToggle: () => void;
-  policyHash?: string;
-}) {
-  return (
-    <Panel
-      title="Policy"
-      desc="The exact YAML the enclave is enforcing — hashed into every decision."
-      right={
-        policyHash ? (
-          <span className="font-mono text-[10px] text-ink-dim">
-            {truncMid(policyHash, 6, 6)}
-          </span>
-        ) : undefined
-      }
-    >
-      <button
-        onClick={onToggle}
-        className="mb-2 inline-flex items-center gap-1.5 text-[12px] text-eigen-accent-soft transition hover:text-eigen-accent"
-      >
-        <span
-          className={`transition-transform ${open ? "rotate-90" : ""}`}
-        >
-          ▸
-        </span>
-        {open ? "Hide policy" : "Show policy"}
-      </button>
-      {open && (
-        <pre className="max-h-[300px] overflow-auto rounded border border-white/10 bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-ink-soft">
-          {policy || "# policy unavailable"}
-        </pre>
-      )}
-    </Panel>
+    </footer>
   );
 }
