@@ -1,8 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
-import eigenIcon from "./assets/brand/eigen-icon.svg";
 import eigenWordmark from "./assets/brand/eigen-wordmark.svg";
 
 const APP_URL = "./app.html";
+
+/** Inline Eigen mark — `currentColor` inherits the page's light text color
+ *  (an <img> renders the dark SVG black/invisible on dark surfaces). */
+function EigenMark({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 22 26" className={className} fill="currentColor" aria-label="Eigen" role="img">
+      <path d="M11.7281 12.7791H8.79615V18.6414H5.86346V1.05103H0V24.5061H5.86346V24.5042H8.79615V24.5061H11.7281V24.5042H17.5922V18.6414H11.7281V12.7791Z" />
+      <path d="M20.5243 1.05103H17.5928V6.91449H20.5243V1.05103Z" />
+      <path d="M14.6601 1.05103L8.91501 1.05164V3.98307H11.7281V12.7773H14.6601V12.7761H17.5922V6.91264H14.6601V1.05103Z" />
+    </svg>
+  );
+}
 
 const GH = "https://github.com/zeeshan8281/eigen-tool-gate";
 const VERIFY_TEE =
@@ -949,11 +960,7 @@ function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <img
-              src={eigenIcon}
-              alt="Eigen"
-              className="h-7 w-auto text-eigen-accent-soft"
-            />
+            <EigenMark className="h-7 w-auto text-ink" />
             <span className="text-[17px] font-semibold">
               Verified Tool Gating
             </span>
