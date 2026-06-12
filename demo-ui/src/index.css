@@ -1,0 +1,120 @@
+/* Geist + Geist Mono via Google Fonts (clean fallback per brief). */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* Eigen brand foundation.
+   Reuses the official palette pulled from the sibling EigenCompute project:
+   Eigen indigo #1a0c6d / #6366f1, dark surfaces #0a0a0a / #171717,
+   white/10 borders, tight radii, and a tech mono stack.
+   PASS/ALLOW = green, BLOCKED/DENY = Eigen destructive red #f87171. */
+@theme {
+  --color-eigen-indigo: #1a0c6d;
+  --color-eigen-indigo-2: #261082;
+  --color-eigen-accent: #6366f1;
+  --color-eigen-accent-soft: #818cf8;
+  --color-eigen-accent-bright: #3b5dff;
+
+  --color-surface-0: #0a0a0a;
+  --color-surface-1: #0e0e10;
+  --color-surface-2: #141417;
+  --color-surface-3: #171717;
+
+  --color-ink: #ededef;
+  --color-ink-soft: #a3a3a3;
+  --color-ink-dim: #737373;
+
+  --color-pass: #34d399;
+  --color-pass-dim: #10b981;
+  --color-deny: #f87171;
+  --color-deny-dim: #ef4444;
+  --color-warn: #fbbf24;
+
+  --radius-sm: 2px;
+  --radius: 4px;
+
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(99, 102, 241, 0.12), transparent 60%),
+    radial-gradient(900px 480px at 0% 0%, rgba(26, 12, 109, 0.28), transparent 55%),
+    var(--color-surface-0);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.35);
+}
+
+/* Custom scrollbars to match the dark surface. */
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.row-in {
+  animation: rowIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-dot {
+  animation: pulseDot 1.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.1) 37%,
+    rgba(255, 255, 255, 0.04) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}

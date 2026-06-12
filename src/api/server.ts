@@ -1,6 +1,10 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import type { RouteDeps } from "./routes.js";
 import { buildRoutes } from "./routes.js";
+import { buildDemoRoutes } from "./demo-routes.js";
 
 export function createApiServer(deps: RouteDeps): express.Express {
   const app = express();
@@ -11,6 +15,35 @@ export function createApiServer(deps: RouteDeps): express.Express {
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     next();
   });
+
   app.use(buildRoutes(deps));
+  app.use(buildDemoRoutes(deps));
+
+  // Serve the built dashboard (demo-ui/dist) from the same port, if present.
+  // In the TEE image this directory is baked in; locally it appears after
+  // `npm --prefix demo-ui run build`.
+  const uiDir = resolveUiDir();
+  if (uiDir) {
+    app.use(express.static(uiDir));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/gate") || req.path.startsWith("/demo") || req.path === "/health") {
+        next();
+        return;
+      }
+      res.sendFile(join(uiDir, "index.html"));
+    });
+  }
+
   return app;
+}
+
+function resolveUiDir(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(here, "../../public"), // baked into the image (dist/../public)
+    join(here, "../../demo-ui/dist"), // local dev from dist/
+    join(process.cwd(), "demo-ui/dist"),
+    join(process.cwd(), "public"),
+  ];
+  return candidates.find((p) => existsSync(join(p, "index.html"))) ?? null;
 }

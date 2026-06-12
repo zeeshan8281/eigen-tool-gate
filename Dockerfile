@@ -1,7 +1,8 @@
-# Verified Tool Gating — runs the policy gate + PostgreSQL inside one TEE image.
+# Verified Tool Gating — policy gate + dashboard + PostgreSQL inside one TEE image.
 # PostgreSQL is co-located so the decision log lives on the enclave's encrypted
 # /data volume and never leaves the TEE.
 
+# --- Stage 1: build the engine (TypeScript -> dist) ---
 FROM --platform=linux/amd64 node:20-slim AS build
 WORKDIR /app
 COPY package*.json tsconfig.json ./
@@ -10,6 +11,15 @@ COPY src ./src
 COPY policies ./policies
 RUN npm run build
 
+# --- Stage 2: build the dashboard (Vite -> demo-ui/dist) ---
+FROM --platform=linux/amd64 node:20-slim AS ui
+WORKDIR /ui
+COPY demo-ui/package*.json ./
+RUN npm ci
+COPY demo-ui/ ./
+RUN npm run build
+
+# --- Stage 3: runtime (PostgreSQL base + Node) ---
 FROM --platform=linux/amd64 postgres:16-bookworm
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates gnupg && \
@@ -21,6 +31,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+COPY --from=ui /ui/dist ./public
 COPY policies ./policies
 COPY scripts ./scripts
 
