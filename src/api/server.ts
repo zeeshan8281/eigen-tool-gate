@@ -41,6 +41,13 @@ export function createApiServer(deps: RouteDeps): express.Express {
     });
   }
 
+  // Final safety net: turn any escaped async error into a 500 instead of an
+  // unhandled rejection that could crash the process.
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[eigen-tool-gate] route error:", err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  });
+
   return app;
 }
 

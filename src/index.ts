@@ -7,6 +7,15 @@ import { getAttestation } from "./tee/attestation.js";
  * server (src/mcp/server.ts) attaches to the same gate instance when an agent
  * framework connects over a transport.
  */
+// Defense in depth: a single tool/route failure must never take down the TEE
+// container. Log and keep serving instead of letting the process exit.
+process.on("unhandledRejection", (reason) => {
+  console.error("[eigen-tool-gate] unhandledRejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[eigen-tool-gate] uncaughtException:", err);
+});
+
 async function main(): Promise<void> {
   const { gate, log, signer } = await bootstrapGate();
   const port = Number(process.env.PORT ?? 8080);

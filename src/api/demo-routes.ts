@@ -159,6 +159,8 @@ async function driveCall(
         message: err.message,
       };
     }
-    throw err;
+    // The gate ALLOWed the call but the real tool failed (network, fs, etc.).
+    // Surface it as a tool error — never let it escape and crash the server.
+    return { tool, args, verdict: "ALLOW", message: `tool error: ${(err as Error).message}` };
   }
 }

@@ -96,7 +96,10 @@ function buildGatedTools(gate: PolicyGate, record: AgentStepRecord[]): ToolSet {
               message: err.message,
             };
           }
-          throw err;
+          // Gate ALLOWed but the real tool failed — hand the error back to the
+          // model so it can adapt; never let it crash the run/server.
+          record.push({ tool: name, args, verdict: "ALLOW", result: { toolError: (err as Error).message } });
+          return { toolError: true, message: (err as Error).message };
         }
       },
     });

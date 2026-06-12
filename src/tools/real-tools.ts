@@ -93,8 +93,15 @@ export const realTools: Record<string, ToolImpl> = {
     run: async (args) => {
       const { unlink } = await import("node:fs/promises");
       const p = toSandbox(String(args.path));
-      await unlink(p);
-      return { path: args.path, deleted: true };
+      try {
+        await unlink(p);
+        return { path: args.path, deleted: true };
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+          return { path: args.path, deleted: false, note: "file did not exist" };
+        }
+        throw err;
+      }
     },
   },
 
