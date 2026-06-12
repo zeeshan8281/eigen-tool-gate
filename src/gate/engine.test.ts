@@ -84,6 +84,24 @@ test("tampering with a verdict breaks verification", async () => {
   assert.ok(result.brokenAt !== null);
 });
 
+test("parallel tool calls do not fork the hash chain", async () => {
+  const { gate, log, signer } = await newGate("s-concurrent");
+  // Fire many evaluations at once, like an agent dispatching tool calls in one
+  // model step. Without serialization these race on prevHash/seq and break.
+  await Promise.all(
+    Array.from({ length: 25 }, (_, i) =>
+      gate.evaluate(i % 2 ? "web_search" : "shell_exec", { query: `q${i}`, command: "x" }),
+    ),
+  );
+  const decisions = await log.bySession("s-concurrent");
+  assert.equal(decisions.length, 25);
+  const seqs = decisions.map((d) => d.sequenceNumber);
+  assert.deepEqual(seqs, Array.from({ length: 25 }, (_, i) => i + 1)); // 1..25, no dupes/gaps
+  const result = verifyDecisionChain(decisions, signer.publicKeyHex, gate.policyHash);
+  assert.equal(result.valid, true);
+  assert.equal(result.errors.length, 0);
+});
+
 test("dropping an entry creates a detectable gap", async () => {
   const { gate, log, signer } = await newGate("s-gap");
   await gate.evaluate("web_search", { query: "a" });

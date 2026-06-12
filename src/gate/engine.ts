@@ -42,6 +42,8 @@ export class PolicyGate {
   private spending: SpendingTracker;
   private seq = 0;
   private seqReady = false;
+  /** Serializes decision creation so parallel tool calls can't fork the chain. */
+  private tail: Promise<void> = Promise.resolve();
 
   constructor(opts: GateOptions) {
     this.policy = opts.loaded.policy;
@@ -80,6 +82,23 @@ export class PolicyGate {
     toolName: string,
     toolArgs: Record<string, unknown>,
     ctx: EvaluationContext = {},
+  ): Promise<PolicyDecision> {
+    // Serialize the read-prevHash → assign-seq → sign → append critical section.
+    // An agent runtime can dispatch several tool calls from one model step in
+    // PARALLEL; without this lock two evaluations would read the same prevHash
+    // and fork the hash chain. The work is sub-millisecond, so queuing is cheap.
+    const run = this.tail.then(() => this.evaluateLocked(toolName, toolArgs, ctx));
+    this.tail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async evaluateLocked(
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    ctx: EvaluationContext,
   ): Promise<PolicyDecision> {
     const now = Date.now();
     const argsHash = sha256(canonicalize(toolArgs)).toString("hex");
