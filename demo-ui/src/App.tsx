@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import eigenIcon from "./assets/brand/eigen-icon.svg";
 import type {
+  AgentCatalog,
+  AgentRunResponse,
   Attestation,
   Catalog,
   PolicyDecision,
@@ -17,6 +19,7 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [attest, setAttest] = useState<Attestation | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [agentCatalog, setAgentCatalog] = useState<AgentCatalog | null>(null);
   const [policy, setPolicy] = useState<string>("");
   const [decisions, setDecisions] = useState<PolicyDecision[]>([]);
   const [chain, setChain] = useState<VerifyChainResponse | null>(null);
@@ -42,6 +45,10 @@ export default function App() {
       // best-effort static fetches (independent)
       api.attestation().then((a) => !cancelled && setAttest(a)).catch(() => {});
       api.catalog().then((c) => !cancelled && setCatalog(c)).catch(() => {});
+      api
+        .agentCatalog()
+        .then((c) => !cancelled && setAgentCatalog(c))
+        .catch(() => {});
       api.policy().then((p) => !cancelled && setPolicy(p)).catch(() => {});
     })();
     return () => {
@@ -138,6 +145,11 @@ export default function App() {
         {/* LEFT COLUMN */}
         <div className="flex flex-col gap-5">
           <AttestationPanel attest={attest} attestUrl={attestUrl} />
+
+          <LiveAgentPanel
+            catalog={agentCatalog}
+            onAfterRun={() => sessionId && refresh(sessionId)}
+          />
 
           <ScenarioPanel
             catalog={catalog}
@@ -316,6 +328,170 @@ function AttestationPanel({
           <Card label="Platform">
             <span className="text-[12px]">{attest.platform ?? "—"}</span>
           </Card>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ===================================================================== */
+/* Live Agent                                                            */
+/* ===================================================================== */
+function LiveAgentPanel({
+  catalog,
+  onAfterRun,
+}: {
+  catalog: AgentCatalog | null;
+  onAfterRun: () => void;
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [filled, setFilled] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<AgentRunResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Pre-fill the prompt with the first example once the catalog loads.
+  useEffect(() => {
+    if (!filled && catalog?.examples?.length) {
+      setPrompt(catalog.examples[0]);
+      setFilled(true);
+    }
+  }, [catalog, filled]);
+
+  const llmReady = catalog?.llmConfigured === true;
+  const canRun = llmReady && !running && prompt.trim().length > 0;
+
+  const run = async () => {
+    if (!canRun) return;
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await api.agentRun(prompt.trim());
+      setResult(r);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(
+        msg.includes("503")
+          ? "Agent unavailable (503) — the LLM may not be configured."
+          : `Agent run failed — ${msg}`,
+      );
+    } finally {
+      setRunning(false);
+      // The agent's tool calls landed as new signed decisions in the same
+      // chain — refresh the live feed + verification panel.
+      onAfterRun();
+    }
+  };
+
+  return (
+    <Panel
+      title="Run a real agent"
+      desc="A real Claude model decides which tools to call. Every call is authorized by the policy gate before it runs."
+      right={
+        catalog?.model ? (
+          <span className="shrink-0 rounded-sm border border-eigen-accent/30 bg-eigen-accent/10 px-2 py-0.5 font-mono text-[10px] text-eigen-accent-soft">
+            {catalog.model}
+          </span>
+        ) : undefined
+      }
+    >
+      {/* example chips */}
+      {!!catalog?.examples?.length && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {catalog.examples.map((ex, i) => (
+            <button
+              key={i}
+              type="button"
+              disabled={running}
+              onClick={() => setPrompt(ex)}
+              className="max-w-full truncate rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-ink-soft transition hover:border-eigen-accent/50 hover:text-eigen-accent-soft disabled:cursor-wait disabled:opacity-60"
+              title={ex}
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        disabled={running}
+        rows={3}
+        placeholder="Ask the agent to do something…"
+        className="w-full resize-y rounded border border-white/10 bg-black/40 px-3 py-2.5 font-sans text-[13px] text-ink outline-none transition placeholder:text-ink-dim focus:border-eigen-accent/60 disabled:opacity-60"
+      />
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <button
+          onClick={run}
+          disabled={!canRun}
+          className="inline-flex items-center gap-2 rounded border border-eigen-accent/50 bg-eigen-accent/15 px-4 py-2 text-[13px] font-semibold text-eigen-accent-soft transition hover:bg-eigen-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {running && (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-[2px] border-eigen-accent-soft/40 border-t-eigen-accent-soft" />
+          )}
+          {running ? "Running agent… (up to 60s)" : "Run agent"}
+        </button>
+
+        {!llmReady && catalog && (
+          <span className="text-[11px] text-ink-dim">
+            LLM not configured in this deployment
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <div className="row-in mt-3 rounded border border-deny/50 bg-deny/10 px-3 py-2 text-[12px] text-deny">
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div className="row-in mt-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-soft">
+            <span className="rounded-sm border border-white/10 bg-surface-2/60 px-2 py-0.5 font-mono">
+              {result.model}
+            </span>
+            <span className="rounded-sm border border-white/10 bg-surface-2/60 px-2 py-0.5 font-mono">
+              {result.stepCount} step{result.stepCount === 1 ? "" : "s"}
+            </span>
+            <span className="font-mono">
+              {result.toolCalls.length} tool call
+              {result.toolCalls.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          {result.toolCalls.length > 0 && (
+            <div className="space-y-1.5">
+              {result.toolCalls.map((c, i) => (
+                <div
+                  key={i}
+                  className="flex flex-wrap items-center gap-2 rounded border border-white/10 bg-surface-2/50 px-2.5 py-2"
+                >
+                  <VerdictChip verdict={c.verdict} />
+                  <span className="font-mono text-[12px] text-ink">
+                    {c.tool}
+                  </span>
+                  {c.verdict === "DENY" && c.reasonCode && (
+                    <span className="rounded-sm bg-deny/15 px-1.5 py-0.5 font-mono text-[10px] text-deny">
+                      {c.reasonCode}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-ink-dim">
+              Agent answer
+            </div>
+            <div className="whitespace-pre-wrap rounded border border-white/10 bg-black/40 px-3.5 py-3 text-[13px] leading-relaxed text-ink">
+              {result.finalText || "—"}
+            </div>
+          </div>
         </div>
       )}
     </Panel>

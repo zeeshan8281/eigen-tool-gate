@@ -1,4 +1,6 @@
 import type {
+  AgentCatalog,
+  AgentRunResponse,
   Attestation,
   Catalog,
   DecisionsResponse,
@@ -25,14 +27,32 @@ async function getText(path: string): Promise<string> {
   return await res.text();
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
-  return (await res.json()) as T;
+async function post<T>(
+  path: string,
+  body?: unknown,
+  timeoutMs?: number,
+): Promise<T> {
+  // The agent run is a real Claude model call (10–60s). Give it a generous
+  // client timeout so we never abort a legitimately-slow run.
+  const ctrl = timeoutMs ? new AbortController() : undefined;
+  const timer = ctrl
+    ? setTimeout(() => ctrl.abort(), timeoutMs)
+    : undefined;
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ctrl?.signal,
+    });
+    if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
+    return (await res.json()) as T;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export const api = {
@@ -53,6 +73,13 @@ export const api = {
   call: (tool: string, args: unknown, hitlApproved?: boolean) =>
     post<StepResult>("/demo/call", { tool, args, hitlApproved }),
   tamperPreview: () => post<TamperPreview>("/demo/tamper-preview"),
+  agentCatalog: () => get<AgentCatalog>("/agent/catalog"),
+  agentRun: (prompt: string, maxSteps?: number) =>
+    post<AgentRunResponse>(
+      "/agent/run",
+      { prompt, maxSteps },
+      120_000, // generous: never abort under 90s
+    ),
 };
 
 export { BASE as API_BASE };

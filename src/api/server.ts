@@ -5,6 +5,7 @@ import express from "express";
 import type { RouteDeps } from "./routes.js";
 import { buildRoutes } from "./routes.js";
 import { buildDemoRoutes } from "./demo-routes.js";
+import { buildAgentRoutes } from "./agent-routes.js";
 
 export function createApiServer(deps: RouteDeps): express.Express {
   const app = express();
@@ -18,6 +19,7 @@ export function createApiServer(deps: RouteDeps): express.Express {
 
   app.use(buildRoutes(deps));
   app.use(buildDemoRoutes(deps));
+  app.use(buildAgentRoutes({ gate: deps.gate }));
 
   // Serve the built dashboard (demo-ui/dist) from the same port, if present.
   // In the TEE image this directory is baked in; locally it appears after
@@ -26,7 +28,12 @@ export function createApiServer(deps: RouteDeps): express.Express {
   if (uiDir) {
     app.use(express.static(uiDir));
     app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/gate") || req.path.startsWith("/demo") || req.path === "/health") {
+      if (
+        req.path.startsWith("/gate") ||
+        req.path.startsWith("/demo") ||
+        req.path.startsWith("/agent") ||
+        req.path === "/health"
+      ) {
         next();
         return;
       }

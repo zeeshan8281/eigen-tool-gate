@@ -43,6 +43,7 @@ ENV POLICY_PATH=${POLICY_PATH} \
     POLICY_HASH=${POLICY_HASH} \
     PGDATA=/data/pgdata \
     DATA_DIR=/data \
+    SANDBOX_ROOT=/data/workspace \
     PORT=8080 \
     DATABASE_URL=postgresql://gate@127.0.0.1:5432/gate
 

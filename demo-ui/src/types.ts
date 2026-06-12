@@ -70,6 +70,31 @@ export interface ScenarioResponse {
   steps: StepResult[];
 }
 
+export interface AgentCatalog {
+  model: string;
+  llmConfigured: boolean;
+  webSearchConfigured: boolean;
+  tools: { name: string; description: string }[];
+  examples: string[];
+}
+
+export interface AgentToolCall {
+  tool: string;
+  args?: unknown;
+  verdict: Verdict;
+  decisionId?: string;
+  reasonCode?: string;
+  result?: unknown;
+}
+
+export interface AgentRunResponse {
+  prompt: string;
+  finalText: string;
+  toolCalls: AgentToolCall[];
+  model: string;
+  stepCount: number;
+}
+
 export interface TamperPreview {
   tamperedSequence: number;
   flippedFrom: Verdict;
