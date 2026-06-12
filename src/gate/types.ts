@@ -40,11 +40,11 @@ export interface RuleConstraints {
   allowed_paths?: string[];
   blocked_paths?: string[];
   max_file_size_bytes?: number;
-  // money
-  max_amount_per_tx?: number;
-  max_amount_per_hour?: number;
-  allowed_recipients?: string[];
-  require_hitl_above?: number;
+  // destructive / approval
+  require_hitl?: boolean; // tool always needs human approval before it runs
+  // data access (SQL)
+  allowed_sql?: string[]; // allowed leading statements, e.g. ["SELECT"]
+  max_rows?: number; // row cap (enforced by the tool on ALLOW)
 }
 
 export interface PolicyRule {

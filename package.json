@@ -30,7 +30,6 @@
     "minimatch": "^10.0.1",
     "pg": "^8.13.1",
     "uuid": "^11.0.3",
-    "viem": "^2.21.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

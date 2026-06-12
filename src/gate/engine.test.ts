@@ -54,14 +54,23 @@ test("deny-by-default for unknown tools", async () => {
   assert.equal(d.reasonCode, "POLICY_DEFAULT_DENY");
 });
 
-test("HITL flow: 75 USDC denied, then allowed with approval", async () => {
+test("HITL flow: file_delete denied, then allowed with approval", async () => {
   const { gate } = await newGate("s-hitl");
-  const recipient = "0xABC0000000000000000000000000000000000001";
-  const denied = await gate.evaluate("wallet_transfer", { recipient, amount: 75 });
+  const path = "/workspace/output/report.md";
+  const denied = await gate.evaluate("file_delete", { path });
   assert.equal(denied.verdict, "DENY");
   assert.equal(denied.reasonCode, "HITL_REQUIRED");
-  const allowed = await gate.evaluate("wallet_transfer", { recipient, amount: 75 }, { hitlApproved: true });
+  const allowed = await gate.evaluate("file_delete", { path }, { hitlApproved: true });
   assert.equal(allowed.verdict, "ALLOW");
+});
+
+test("db_query allows SELECT, denies DROP at the gate", async () => {
+  const { gate } = await newGate("s-sql");
+  const ok = await gate.evaluate("db_query", { sql: "SELECT 1" });
+  assert.equal(ok.verdict, "ALLOW");
+  const bad = await gate.evaluate("db_query", { sql: "DROP TABLE policy_decisions" });
+  assert.equal(bad.verdict, "DENY");
+  assert.equal(bad.reasonCode, "SQL_VIOLATION");
 });
 
 test("tampering with a verdict breaks verification", async () => {
@@ -87,19 +96,14 @@ test("dropping an entry creates a detectable gap", async () => {
   assert.ok(result.gaps.includes(2));
 });
 
-test("spending per-session cap enforced across calls", async () => {
-  const { gate } = await newGate("s-spend");
-  const recipient = "0xABC0000000000000000000000000000000000001";
-  // per_session cap is 1000; each within per-tx (100) and HITL-approved.
-  let denied = 0;
-  for (let i = 0; i < 12; i++) {
-    const d = await gate.evaluate(
-      "wallet_transfer",
-      { recipient, amount: 100 },
-      { hitlApproved: true },
-    );
-    if (d.verdict === "DENY" && d.reasonCode === "SPENDING_LIMIT") denied++;
-  }
-  // 10 * 100 = 1000 allowed, the 11th and 12th exceed the session cap.
-  assert.ok(denied >= 1);
+test("file_delete outside allowed_paths is denied even with approval", async () => {
+  const { gate } = await newGate("s-del-path");
+  // /workspace/src is not in file_delete.allowed_paths (/workspace/output/**)
+  const d = await gate.evaluate(
+    "file_delete",
+    { path: "/workspace/src/main.ts" },
+    { hitlApproved: true },
+  );
+  assert.equal(d.verdict, "DENY");
+  assert.equal(d.reasonCode, "PATH_VIOLATION");
 });

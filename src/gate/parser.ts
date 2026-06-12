@@ -22,24 +22,12 @@ function isVerdict(v: unknown): v is Verdict {
 }
 
 /**
- * Tools whose arguments carry money. Used to decide when spending limits run.
- * Kept declarative: any rule that defines amount/recipient constraints, plus a
- * couple of well-known names, is treated as financial.
+ * Tools subject to the optional per-session/per-day quota tracker. Declarative:
+ * any rule carrying a `max_calls_per_minute`-style quota could opt in here. Left
+ * empty by default — the demo gates on access/approval, not metered quotas.
  */
-function detectFinancialTools(rules: PolicyRule[]): string[] {
-  const known = new Set(["wallet_transfer", "payment", "transfer", "x402_pay"]);
-  for (const r of rules) {
-    const c = r.constraints ?? {};
-    if (
-      c.max_amount_per_tx !== undefined ||
-      c.max_amount_per_hour !== undefined ||
-      c.allowed_recipients !== undefined ||
-      c.require_hitl_above !== undefined
-    ) {
-      known.add(r.tool);
-    }
-  }
-  return [...known];
+function detectFinancialTools(_rules: PolicyRule[]): string[] {
+  return [];
 }
 
 export function parsePolicy(raw: string): ParsedPolicy {
@@ -135,10 +123,9 @@ function validateConstraints(
     allowed_paths: arrOrUndef("allowed_paths"),
     blocked_paths: arrOrUndef("blocked_paths"),
     max_file_size_bytes: numOrUndef(c.max_file_size_bytes),
-    max_amount_per_tx: numOrUndef(c.max_amount_per_tx),
-    max_amount_per_hour: numOrUndef(c.max_amount_per_hour),
-    allowed_recipients: arrOrUndef("allowed_recipients"),
-    require_hitl_above: numOrUndef(c.require_hitl_above),
+    require_hitl: c.require_hitl === undefined ? undefined : Boolean(c.require_hitl),
+    allowed_sql: arrOrUndef("allowed_sql"),
+    max_rows: numOrUndef(c.max_rows),
   };
 }
 

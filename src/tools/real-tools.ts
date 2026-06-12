@@ -87,6 +87,23 @@ export const realTools: Record<string, ToolImpl> = {
     },
   },
 
+  file_delete: {
+    description: "Permanently delete a file from the agent workspace. Destructive.",
+    params: { path: { type: "string", description: "Absolute path under /workspace" } },
+    run: async (args) => {
+      const { unlink } = await import("node:fs/promises");
+      const p = toSandbox(String(args.path));
+      await unlink(p);
+      return { path: args.path, deleted: true };
+    },
+  },
+
+  db_query: {
+    description: "Run a read-only SQL query against the audit database (the decision log itself).",
+    params: { sql: { type: "string", description: "A SELECT statement" } },
+    run: async (args) => dbQuery(String(args.sql ?? args.query ?? ""), Number(args.maxRows ?? 100)),
+  },
+
   shell_exec: {
     description: "Execute a shell command. (Denied by the demo policy — present so the gate has something to block.)",
     params: { command: { type: "string", description: "Command to run" } },
@@ -99,15 +116,6 @@ export const realTools: Record<string, ToolImpl> = {
       const { stdout, stderr } = await run("/bin/sh", ["-c", String(args.command)], { timeout: 5_000 });
       return { command: args.command, stdout: stdout.slice(0, 4_000), stderr: stderr.slice(0, 2_000) };
     },
-  },
-
-  wallet_transfer: {
-    description: "Transfer USDC to a recipient address.",
-    params: {
-      recipient: { type: "string", description: "Recipient address" },
-      amount: { type: "number", description: "Amount in USDC" },
-    },
-    run: async (args) => walletTransfer(String(args.recipient), Number(args.amount)),
   },
 };
 
@@ -138,48 +146,28 @@ async function webSearch(query: string, maxResults: number): Promise<unknown> {
   };
 }
 
+// Lazy, shared read pool for db_query against the co-located Postgres.
+let dbPool: import("pg").Pool | null = null;
+
 /**
- * USDC transfer. Real on-chain transfer when WALLET_PRIVATE_KEY + an EVM RPC are
- * configured (Base Sepolia by default); otherwise returns a clearly-flagged
- * simulated receipt. Either way the GATE decision in front of this is real — this
- * is the consequence, not the proof.
+ * Real SQL against the audit database (the same Postgres that stores the
+ * decision log). The gate's allowed_sql constraint blocks anything but SELECT
+ * before we get here, so a DROP/DELETE never reaches this code. We add a defensive
+ * LIMIT and a statement_timeout as belt-and-suspenders.
  */
-async function walletTransfer(recipient: string, amount: number): Promise<unknown> {
-  const pk = process.env.WALLET_PRIVATE_KEY;
-  const rpc = process.env.EVM_RPC_URL;
-  const usdc = process.env.USDC_ADDRESS;
-  if (!pk || !rpc || !usdc) {
-    return {
-      recipient,
-      amount,
-      simulated: true,
-      note: "set WALLET_PRIVATE_KEY + EVM_RPC_URL + USDC_ADDRESS to broadcast a real ERC-20 transfer",
-    };
+async function dbQuery(sql: string, maxRows: number): Promise<unknown> {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    return { error: "no database configured (DATABASE_URL unset)", rows: [] as unknown[] };
   }
-  const { createWalletClient, http, parseUnits, encodeFunctionData } = await import("viem");
-  const { privateKeyToAccount } = await import("viem/accounts");
-  const account = privateKeyToAccount(pk as `0x${string}`);
-  const client = createWalletClient({ account, transport: http(rpc) });
-  const data = encodeFunctionData({
-    abi: [
-      {
-        name: "transfer",
-        type: "function",
-        stateMutability: "nonpayable",
-        inputs: [
-          { name: "to", type: "address" },
-          { name: "value", type: "uint256" },
-        ],
-        outputs: [{ name: "", type: "bool" }],
-      },
-    ],
-    functionName: "transfer",
-    args: [recipient as `0x${string}`, parseUnits(String(amount), 6)],
-  });
-  const txHash = await client.sendTransaction({
-    to: usdc as `0x${string}`,
-    data,
-    chain: null,
-  });
-  return { recipient, amount, simulated: false, txHash };
+  if (!dbPool) {
+    const pg = (await import("pg")).default;
+    dbPool = new pg.Pool({ connectionString: url, max: 2, statement_timeout: 5_000 });
+  }
+  const res = await dbPool.query(sql);
+  return {
+    rowCount: res.rowCount,
+    rows: res.rows.slice(0, Math.max(1, maxRows)),
+    truncated: (res.rows?.length ?? 0) > maxRows,
+  };
 }

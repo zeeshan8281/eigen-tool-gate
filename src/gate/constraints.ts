@@ -87,36 +87,25 @@ export function evaluateConstraints(
     }
   }
 
-  // --- Financial constraints ---
-  if (constraints.allowed_recipients && args.recipient != null) {
-    const recipient = String(args.recipient);
-    if (!constraints.allowed_recipients.includes(recipient)) {
+  // --- Data-access constraints (SQL statement allowlist) ---
+  if (constraints.allowed_sql && (args.sql != null || args.query != null)) {
+    const sql = String(args.sql ?? args.query).trim();
+    const keyword = (sql.split(/\s+/)[0] ?? "").toUpperCase();
+    const allowed = constraints.allowed_sql.map((s) => s.toUpperCase());
+    if (!allowed.includes(keyword)) {
       return deny(
-        "RECIPIENT_VIOLATION",
-        `recipient "${recipient}" is not in allowed_recipients`,
+        "SQL_VIOLATION",
+        `SQL statement "${keyword || "(empty)"}" is not in allowed_sql [${allowed.join(", ")}]`,
       );
     }
   }
 
-  if (constraints.max_amount_per_tx != null && args.amount != null) {
-    const amount = Number(args.amount);
-    if (amount > constraints.max_amount_per_tx) {
-      return deny(
-        "AMOUNT_EXCEEDED",
-        `amount ${amount} exceeds max_amount_per_tx ${constraints.max_amount_per_tx}`,
-      );
-    }
-  }
-
-  // HITL threshold — denied unless a human approval flag is present in context.
-  if (constraints.require_hitl_above != null && args.amount != null) {
-    const amount = Number(args.amount);
-    if (amount > constraints.require_hitl_above && !ctx.hitlApproved) {
-      return deny(
-        "HITL_REQUIRED",
-        `amount ${amount} exceeds HITL threshold ${constraints.require_hitl_above}; human approval required`,
-      );
-    }
+  // --- HITL: this tool always requires human approval ---
+  if (constraints.require_hitl && !ctx.hitlApproved) {
+    return deny(
+      "HITL_REQUIRED",
+      `this action requires human-in-the-loop approval before it can run`,
+    );
   }
 
   return PASS;

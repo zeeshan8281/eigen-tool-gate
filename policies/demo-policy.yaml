@@ -32,21 +32,20 @@ rules:
       allowed_domains: ["api.github.com", "api.openai.com"]
       max_body_size_bytes: 1048576
 
-  - tool: "shell_exec"
-    verdict: DENY # explicitly blocked
-
-  - tool: "wallet_transfer"
+  - tool: "db_query"
     verdict: ALLOW
     constraints:
-      max_amount_per_tx: 100 # USDC
-      max_amount_per_hour: 500
-      allowed_recipients: ["0xABC0000000000000000000000000000000000001", "0xDEF0000000000000000000000000000000000002"]
-      require_hitl_above: 50 # human-in-the-loop above $50
+      allowed_sql: ["SELECT"] # read-only: DROP / DELETE / UPDATE / INSERT are denied
+      max_rows: 100
 
-spending_limits:
-  currency: "USDC"
-  per_session: 1000
-  per_day: 5000
+  - tool: "file_delete"
+    verdict: ALLOW
+    constraints:
+      allowed_paths: ["/workspace/output/**"] # may only delete its own outputs
+      require_hitl: true # destructive — always needs human approval
+
+  - tool: "shell_exec"
+    verdict: DENY # explicitly blocked
 
 rate_limits:
   global_max_calls_per_minute: 100
